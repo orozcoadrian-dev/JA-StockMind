@@ -1,0 +1,1 @@
+Debo realizar un parcial utilizando un agente IA (Entorno agéntico), dame una situación contexto que encaje perfectamente con esta situación contexto, no quiero algo que le puedas dar a los otros usuarios que te usen, sino algo profundo real y si es posible, específico.
