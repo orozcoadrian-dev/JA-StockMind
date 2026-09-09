@@ -1,0 +1,52 @@
+Create a professional GitHub README banner for an AI agent project called “JA”, focused on solving inventory inconsistencies in a motorcycle business.
+
+Use the provided photo of the company as the main visual reference. Incorporate recognizable elements from the company, such as its facade, motorcycle-related environment, products, or visual identity, but transform them into a clean and modern graphic composition rather than simply placing the photo as-is.
+
+The project is based on an AI agent that analyzes inventory records from multiple suppliers, detects duplicate physical products despite having different names, codes, descriptions, or categories, compares similarities between records, reasons about possible matches, classifies them according to confidence level, and generates reports for human validation.
+
+The banner should communicate these concepts visually:
+
+- Artificial intelligence
+- Inventory management
+- Motorcycle products
+- Data analysis
+- Product matching and duplicate detection
+- Multiple suppliers
+- Intelligent decision-making
+- Human validation
+
+Visual style:
+
+- Minimalist
+- Modern
+- Professional
+- Technological
+- Clean and elegant
+- Suitable for a university software engineering project
+- Designed specifically as a GitHub README header/banner
+- Strong visual hierarchy with generous negative space
+- Avoid excessive details, clutter, futuristic clichés, or generic AI imagery
+
+Color palette:
+
+- Primary color: vibrant motorcycle green
+- Secondary colors: black, dark charcoal, white, and subtle gray
+- Green should be the dominant accent and create a visual connection with motorcycle culture and technology.
+
+Include the “JA” logo/monogram prominently but elegantly. The logo must remain simple and readable.
+
+Integrate a sleek sport motorcycle silhouette inspired by modern Kawasaki-style motorcycles, without copying any official Kawasaki logo, branding, or copyrighted design elements.
+
+The composition should subtly represent the process of:
+Supplier Data → AI Analysis → Product Matching → Duplicate Detection → Human Validation
+
+Do not use excessive text. If text is included, only use:
+“JA”
+and optionally:
+“Intelligent Inventory Analysis”
+
+Aspect ratio: wide horizontal banner, optimized for GitHub README, approximately 3:1 or 4:1.
+
+The final result should look like a real professional software project identity created for a motorcycle company, combining the company's physical environment with artificial intelligence, data analysis, and inventory management.
+
+Generame la foto en base a lo que te pedi para el readme, que tenga el nombre de mi marca JA StockMind y se vea en colaboración con imperio motos, y además que se vea de fondo motos kawasaki y altos cc
