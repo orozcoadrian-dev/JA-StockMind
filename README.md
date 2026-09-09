@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="[https://raw.githubusercontent.com/TU_USUARIO/JA-StockMind/main/assets/banner.png](https://github.com/orozcoadrian-dev/JA-StockMind/blob/ad7c643b4b44acfc380e9065d61eec680a4b1b1c/01-Brand/banner.png)" alt="JA StockMind Banner">
+<img src="https://github.com/orozcoadrian-dev/JA-StockMind/blob/99c985023b6278ce5a3c6e64b745c6e133b7ef5d/01-Brand/banner.png" alt="JA StockMind Banner">
 
 # JA StockMind
 
