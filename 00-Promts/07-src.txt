@@ -18,6 +18,7 @@ Por favor, genérame el código completo siguiendo estos parámetros:
 
 3. Buenas prácticas:
 - Aplica un diseño completamente responsivo (Flexbox/Grid).
+- Coloca en la carpeta backend todo lo que sea backend y frontend todo lo que sea frontend.
 - Incluye un ejemplo de cómo debería ser el primer commit de este proyecto utilizando el estándar de Conventional Commits (ej. feat:, chore:, etc.).
 
 Entrégame los archivos principales (app.py, index.html, inventario.html, styles.css y script.js) con comentarios claros explicando la lógica del agente y la conexión entre el frontend y el backend.

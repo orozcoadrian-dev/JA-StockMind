@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventario - Imperio Motos SAS</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell dashboard-shell">
+      <header class="site-header dashboard-header">
+        <nav class="nav container">
+          <div class="brand">
+            <span class="brand-mark">IM</span>
+            <span>Imperio Motos SAS</span>
+          </div>
+          <div class="nav-links">
+            <a href="index.html">Inicio</a>
+            <a href="#">Inventarios</a>
+            <a href="#">Reportes</a>
+          </div>
+          <button class="btn btn-primary" id="loadSkusButton">Ejecutar Agente</button>
+        </nav>
+      </header>
+
+      <main class="dashboard container">
+        <aside class="sidebar-panel">
+          <h2>Panel</h2>
+          <ul>
+            <li class="active">Inventario ambiguo</li>
+            <li>SKU De-duplicados</li>
+            <li>Historial</li>
+            <li>Configuración</li>
+          </ul>
+        </aside>
+
+        <section class="inventory-panel">
+          <div class="panel-topbar">
+            <div>
+              <p class="eyebrow">Monitoreo</p>
+              <h1>Inventario con revisión humana</h1>
+            </div>
+            <button class="btn btn-primary" id="runAgentButton">Ejecutar Agente</button>
+          </div>
+
+          <div class="summary-cards">
+            <div class="summary-card">
+              <span>Items ambiguos</span>
+              <strong id="ambiguousCount">0</strong>
+            </div>
+            <div class="summary-card">
+              <span>Con similitud alta</span>
+              <strong id="highConfidenceCount">0</strong>
+            </div>
+            <div class="summary-card">
+              <span>Acciones sugeridas</span>
+              <strong id="suggestedActionsCount">0</strong>
+            </div>
+          </div>
+
+          <div class="table-card">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Proveedor A</th>
+                  <th>SKU A</th>
+                  <th>Proveedor B</th>
+                  <th>SKU B</th>
+                  <th>Motivo</th>
+                  <th>Resultado</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
+              <tbody id="inventoryTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
