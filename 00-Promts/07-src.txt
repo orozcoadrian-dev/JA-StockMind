@@ -1,0 +1,23 @@
+¡Hola! Actúa como un Desarrollador Full Stack Senior y Arquitecto de IA. Necesito que programes una Prueba de Concepto (PoC) funcional para mi parcial de 6to semestre de Ingeniería de Sistemas (proyecto de Adrián Orozco y Jaber Vargas).
+
+El sistema es un entorno agéntico para "Imperio Motos SAS" que detecta y gestiona SKUs duplicados de diferentes proveedores (ej. "Manilar rojo" vs "Grip rojo").
+
+Por favor, genérame el código completo siguiendo estos parámetros:
+
+1. Arquitectura y Backend (Python):
+- Utiliza FastAPI o Flask para el servidor web y la API.
+- Crea un script en Python que simule el "Agente IA". Este debe incluir una función que reciba dos cadenas de texto (nombres/descripciones de repuestos), calcule la similitud semántica (puedes usar librerías como `difflib`, `spacy` o una simulación probabilística lógica) y devuelva un JSON con el nivel de confianza y una recomendación (Fusionar/Revisar).
+- Muestra una estructura de directorios profesional para el repositorio.
+- Crea un agent.md y un readme.md
+
+2. Frontend (HTML, CSS, JS):
+- Diseño UI/UX: Temática de motocicletas y repuestos. Utiliza un diseño moderno en "Dark Mode" (fondos color grafito oscuro) resaltado con detalles y botones en un color verde vibrante o neón. 
+- Vistas requeridas:
+  * Landing Page: Una página de inicio atractiva que presente el "Agente de Inventario Inteligente de Imperio Motos".
+  * Pantalla de Inventarios (Human-in-the-Loop): Un panel de control donde se listen productos ambiguos. Debe incluir un botón para "Ejecutar Agente", el cual consuma la API de Python mediante fetch (JavaScript) y actualice la interfaz mostrando el porcentaje de similitud y sugiriendo la fusión de los SKUs.
+
+3. Buenas prácticas:
+- Aplica un diseño completamente responsivo (Flexbox/Grid).
+- Incluye un ejemplo de cómo debería ser el primer commit de este proyecto utilizando el estándar de Conventional Commits (ej. feat:, chore:, etc.).
+
+Entrégame los archivos principales (app.py, index.html, inventario.html, styles.css y script.js) con comentarios claros explicando la lógica del agente y la conexión entre el frontend y el backend.
