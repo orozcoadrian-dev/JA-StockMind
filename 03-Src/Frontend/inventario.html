@@ -16,10 +16,10 @@
           </div>
           <div class="nav-links">
             <a href="index.html">Inicio</a>
-            <a href="#">Inventarios</a>
-            <a href="#">Reportes</a>
+            <a href="inventario.html">Inventarios</a>
+            <a href="reportes.html">Reportes</a>
           </div>
-          <button class="btn btn-primary" id="loadSkusButton">Ejecutar Agente</button>
+          <button class="btn btn-primary" id="loadSkusButton">Actualizar</button>
         </nav>
       </header>
 
@@ -32,6 +32,18 @@
             <li>Historial</li>
             <li>Configuración</li>
           </ul>
+
+          <div class="sidebar-box">
+            <h3>Resumen rápido</h3>
+            <div class="mini-stat">
+              <span>Stock crítico</span>
+              <strong id="stockCriticalValue">0</strong>
+            </div>
+            <div class="mini-stat">
+              <span>Revisiones hoy</span>
+              <strong id="reviewsTodayValue">0</strong>
+            </div>
+          </div>
         </aside>
 
         <section class="inventory-panel">
