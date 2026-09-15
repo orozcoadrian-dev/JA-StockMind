@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from Backend.agent import SemanticAgent
+from Backend.Agent.agent import SemanticAgent
 
 app = FastAPI(
     title="Imperio Motos SAS - Inventory Agent PoC",

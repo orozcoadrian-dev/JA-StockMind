@@ -5,8 +5,9 @@ Este proyecto es un PoC funcional para un entorno agéntico de gestión de inven
 
 ## Arquitectura
 - Backend en Python con FastAPI
-- Agente semántico simulado en `backend/agent.py`
+- Agente semántico simulado en `Backend/Agent/agent.py`
 - Frontend estático en `Frontend/` usando HTML, CSS y JavaScript
+- Archivos HTML en `Frontend/Pages/`, estilos en `Frontend/Assets/styles.css` y lógica en `Frontend/Assets/Js/script.js`
 - API principal: `/api/compare-skus`
 - Datos de ejemplo: `/api/ambiguous-skus`
 

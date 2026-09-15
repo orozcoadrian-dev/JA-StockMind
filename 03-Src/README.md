@@ -14,18 +14,26 @@ Desarrollar una prueba de concepto para un parcial de 6to semestre, con enfoque 
 ```text
 03-Src/
 ├── Backend/
-│   ├── __init__.py
-│   ├── agent.py
+│   ├── Agent/
+│   │   └── agent.py
+│   ├── Api/
+│   │   └── __init__.py
 │   ├── app.py
 │   ├── requirements.txt
 │   └── ...
 ├── Frontend/
+│   ├── Assets/
+│   │   ├── Js/
+│   │   │   └── script.js
+│   │   └── styles.css
+│   ├── Pages/
+│   │   ├── inventario.html
+│   │   └── reportes.html
 │   ├── index.html
-│   ├── inventario.html
-│   ├── styles.css
-│   └── script.js
+│   └── ...
+├── Docs/
+│   └── agent.md
 ├── README.md
-├── agent.md
 └── .gitignore
 ```
 
