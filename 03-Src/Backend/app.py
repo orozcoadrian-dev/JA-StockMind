@@ -1,25 +1,56 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from Backend.Agent.agent import SemanticAgent
+from Backend.Api.health import router as health_router
+from Backend.Api.agent import router as agent_router
+from Backend.Api.imports import router as imports_router
+from Backend.Api.matches import router as matches_router
+from Backend.Api.rest import router as rest_router
+from Backend.database import init_db
 
 app = FastAPI(
     title="Imperio Motos SAS - Inventory Agent PoC",
     description="PoC funcional de agente IA para detectar SKUs duplicados y sugerir fusión.",
     version="1.0.0",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://127.0.0.1:5500", "http://localhost:5500", "http://127.0.0.1:5501", "http://localhost:5501"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 agent = SemanticAgent()
+app.include_router(health_router)
+app.include_router(agent_router)
+app.include_router(imports_router)
+app.include_router(matches_router)
+app.include_router(rest_router)
+init_db()
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(status_code=422, content={"error": {"code": "VALIDATION_ERROR", "message": "La solicitud no cumple el contrato.", "details": exc.errors()}})
+
+
+@app.exception_handler(HTTPException)
+async def http_error_handler(request: Request, exc: HTTPException):
+    return JSONResponse(status_code=exc.status_code, headers=exc.headers, content={"error": {"code": f"HTTP_{exc.status_code}", "message": str(exc.detail), "details": {}}})
+
+
+@app.exception_handler(Exception)
+async def unhandled_error_handler(request: Request, exc: Exception):
+    return JSONResponse(status_code=500, content={"error": {"code": "INTERNAL_ERROR", "message": "Ocurrió un error interno.", "details": {}}})
 
 
 class CompareRequest(BaseModel):
@@ -181,6 +212,11 @@ REPORTS = {
 
 @app.get("/health")
 def health_check():
+    return {"status": "ok", "service": "imperio-motos-agent"}
+
+
+@app.get("/api/health")
+def health_check_alias():
     return {"status": "ok", "service": "imperio-motos-agent"}
 
 

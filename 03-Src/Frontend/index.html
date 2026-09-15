@@ -3,122 +3,43 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Imperio Motos SAS</title>
+    <title>StockMind / Panel</title>
     <link rel="stylesheet" href="Assets/styles.css" />
   </head>
-  <body>
-    <div class="page-shell">
-      <header class="site-header">
-        <nav class="nav container">
-          <div class="brand">
-            <span class="brand-mark">IM</span>
-            <span>Imperio Motos SAS</span>
-          </div>
-          <div class="nav-links">
-            <a href="#features">Solución</a>
-            <a href="#workflow">Flujo</a>
-            <a href="Pages/inventario.html">Inventario</a>
-            <a href="Pages/reportes.html">Reportes</a>
-          </div>
-          <a class="btn btn-primary" href="Pages/inventario.html">Abrir panel</a>
+  <body data-page="dashboard">
+    <div class="app-shell">
+      <aside class="side-rail">
+        <a class="brand" href="index.html"><span class="brand-mark">SM</span><span>STOCK<span class="brand-accent">MIND</span></span></a>
+        <p class="rail-caption">CONTROL DE REPUESTOS</p>
+        <nav class="main-nav" aria-label="Navegación principal">
+          <a class="nav-item active" href="index.html"><span class="nav-icon">⌂</span>Panel</a>
+          <a class="nav-item" href="Pages/importar.html"><span class="nav-icon">↑</span>Importar lista</a>
+          <a class="nav-item" href="Pages/inventario.html"><span class="nav-icon">▦</span>Inventario</a>
+          <a class="nav-item" href="Pages/coincidencias.html"><span class="nav-icon">≈</span>Coincidencias</a>
+          <a class="nav-item" href="Pages/agente.html"><span class="nav-icon">✦</span>Agente</a>
+          <a class="nav-item" href="Pages/reportes.html"><span class="nav-icon">↗</span>Reportes</a>
         </nav>
-      </header>
+        <div class="rail-footer"><span class="live-dot"></span><span>API conectada</span><small>v1 · Cartagena</small></div>
+      </aside>
 
-      <main>
-        <section class="hero">
-          <div class="container hero-content">
-            <div class="hero-copy">
-              <p class="eyebrow">Agente de inventario inteligente</p>
-              <h1>Detecta duplicados de SKUs antes de que impacten tu stock.</h1>
-              <p class="hero-text">
-                El sistema analiza descripciones de repuestos de diferentes proveedores y
-                recomienda fusionarlos o revisarlos con ayuda de un agente IA, además de
-                mostrar un panel operativo con métricas y alertas en tiempo real.
-              </p>
-              <div class="hero-actions">
-                <a class="btn btn-primary" href="Pages/inventario.html">Ver inventario</a>
-                <a class="btn btn-secondary" href="Pages/reportes.html">Ver reportes</a>
-              </div>
-              <ul class="hero-stats">
-                <li><strong>96%</strong><span>salud del inventario</span></li>
-                <li><strong>5</strong><span>revisiones pendientes</span></li>
-                <li><strong>3</strong><span>alertas activas</span></li>
-              </ul>
-            </div>
+      <main class="main-content">
+        <header class="topbar"><div><p class="kicker">LUNES / 14 SEP 2026</p><h1>Estado del inventario</h1></div><a class="button button-primary" href="Pages/importar.html"><span>＋</span> Nueva lista</a></header>
+        <section class="data-band"><div><span class="section-label">LECTURA OPERATIVA</span><h2>El catálogo, sin ruido.</h2><p>Productos normalizados, equivalencias trazables y decisiones listas para revisión.</p></div><div class="band-graphic" aria-hidden="true"><span>01</span><i></i><span>02</span><i></i><span>03</span></div></section>
 
-            <div class="hero-visual">
-              <div class="dashboard-card">
-                <div class="card-header">
-                  <span class="status-dot"></span>
-                  <span>Inventario ambiguo</span>
-                </div>
-                <div class="mini-table">
-                  <div class="row">
-                    <span>Grip rojo</span>
-                    <span class="badge success">Fusionar</span>
-                  </div>
-                  <div class="row">
-                    <span>Asiento negro</span>
-                    <span class="badge warning">Revisar</span>
-                  </div>
-                  <div class="row">
-                    <span>Filtro aceite 1.5L</span>
-                    <span class="badge success">Fusionar</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+        <section class="metric-grid" aria-label="Resumen del inventario">
+          <article class="metric-card metric-feature"><span class="metric-label">PRODUCTOS ÚNICOS</span><strong id="metricCanonical">—</strong><span class="metric-note">catálogo consolidado</span></article>
+          <article class="metric-card"><span class="metric-label">SIN CONSOLIDAR</span><strong id="metricUnlinked">—</strong><span class="metric-note">requieren equivalencia</span></article>
+          <article class="metric-card metric-alert"><span class="metric-label">REVISIÓN PENDIENTE</span><strong id="metricPending">—</strong><span class="metric-note">decisiones humanas</span></article>
+          <article class="metric-card"><span class="metric-label">STOCK CRÍTICO</span><strong id="metricCritical">—</strong><span class="metric-note">bajo mínimo</span></article>
         </section>
 
-        <section id="features" class="features">
-          <div class="container section-heading">
-            <p class="eyebrow">¿Qué hace el sistema?</p>
-            <h2>Coordinación inteligente entre producto, proveedor y decisión.</h2>
-          </div>
-          <div class="container features-grid">
-            <article class="feature-card">
-              <div class="icon">01</div>
-              <h3>Normalización</h3>
-              <p>Convierte distintos nombres de repuestos en una estructura comparable.</p>
-            </article>
-            <article class="feature-card">
-              <div class="icon">02</div>
-              <h3>Comparación semántica</h3>
-              <p>Evalúa similitud textual y de términos usando reglas del dominio.</p>
-            </article>
-            <article class="feature-card">
-              <div class="icon">03</div>
-              <h3>Decisión humana</h3>
-              <p>Recomienda fusionar o revisar con apoyo de un agente y un flujo controlado.</p>
-            </article>
-          </div>
+        <section class="dashboard-grid">
+          <article class="panel panel-wide"><div class="panel-heading"><div><span class="section-label">ÚLTIMAS COINCIDENCIAS</span><h2>Revisión humana</h2></div><a class="text-link" href="Pages/coincidencias.html">Ver todas <span>→</span></a></div><div id="dashboardMatches" class="match-list"><div class="loading-line"></div></div></article>
+          <article class="panel"><div class="panel-heading"><div><span class="section-label">ACCESOS</span><h2>Trabajo rápido</h2></div></div><div class="quick-actions"><a href="Pages/importar.html"><span class="quick-icon">↑</span><b>Subir proveedor</b><small>Procesar Excel</small><span>→</span></a><a href="Pages/agente.html"><span class="quick-icon">✦</span><b>Consultar agente</b><small>Buscar una respuesta</small><span>→</span></a><a href="Pages/reportes.html"><span class="quick-icon">↗</span><b>Ver reportes</b><small>Precios y compras</small><span>→</span></a></div></article>
         </section>
-
-        <section id="workflow" class="workflow">
-          <div class="container section-heading">
-            <p class="eyebrow">Flujo del agente</p>
-            <h2>Desde la detección hasta la recomendación final.</h2>
-          </div>
-          <div class="container process-grid">
-            <div class="process-step">
-              <span>01</span>
-              <h3>Importar</h3>
-              <p>Se identifican partidas ambiguas entre proveedores y se consolidan los registros.</p>
-            </div>
-            <div class="process-step">
-              <span>02</span>
-              <h3>Analizar</h3>
-              <p>El agente calcula similitud semántica, confianza y evidencia de coincidencia.</p>
-            </div>
-            <div class="process-step">
-              <span>03</span>
-              <h3>Decidir</h3>
-              <p>La interfaz muestra recomendaciones con estado, métricas y acciones sugeridas.</p>
-            </div>
-          </div>
-        </section>
+        <div id="dashboardNotice" class="notice" role="status" hidden></div>
       </main>
     </div>
+    <script src="Assets/Js/script.js"></script>
   </body>
 </html>

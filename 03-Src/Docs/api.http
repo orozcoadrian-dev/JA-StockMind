@@ -1,0 +1,94 @@
+@host = http://127.0.0.1:8000/api/v1
+@json = application/json
+
+### Salud
+GET {{host}}/health
+
+### Proveedores
+GET {{host}}/suppliers?page=1&per_page=20
+POST {{host}}/suppliers
+Content-Type: {{json}}
+
+{"name":"Malusa","nit":"900123456-7","contact":"compras@malusa.example","active":true}
+
+GET {{host}}/suppliers/1
+PATCH {{host}}/suppliers/1
+Content-Type: {{json}}
+
+{"name":"Malusa","nit":"900123456-7","contact":"compras actualizado","active":true}
+
+### Importaciones
+# En VS Code REST Client, sustituye la ruta por un archivo local real.
+POST {{host}}/imports
+Content-Type: multipart/form-data; boundary=upload
+
+--upload
+Content-Disposition: form-data; name="supplier_id"
+
+1
+--upload
+Content-Disposition: form-data; name="file"; filename="malusa_grips.xlsx"
+Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+
+< ./Backend/Tests/fixtures/malusa_grips.xlsx
+--upload--
+
+GET {{host}}/imports?page=1&per_page=20
+GET {{host}}/imports/1
+
+### Productos y catálogo
+GET {{host}}/products?page=1&per_page=20&category=manillar&sort=-price
+GET {{host}}/products/1
+GET {{host}}/canonical-products?page=1&per_page=20
+POST {{host}}/canonical-products
+Content-Type: {{json}}
+
+{"name":"Grip rojo deportivo","category":"manillar","attributes":{"color":"rojo","measure":"22mm"},"stock_in_bodega":0,"minimum_stock":5}
+
+GET {{host}}/canonical-products/1
+PATCH {{host}}/canonical-products/1
+Content-Type: {{json}}
+
+{"name":"Grip rojo deportivo","category":"manillar","attributes":{"color":"rojo","measure":"22mm"},"stock_in_bodega":4,"minimum_stock":5}
+
+GET {{host}}/canonical-products/1/suppliers
+
+### Coincidencias
+POST {{host}}/matches/suggest
+GET {{host}}/matches/pending?page=1&per_page=20
+POST {{host}}/matches/1/confirm
+POST {{host}}/matches/1/reject
+Content-Type: {{json}}
+
+{"create_exclusion_rule":true,"original_text":"No fusionar estos dos productos aunque se parezcan"}
+
+### Reglas
+GET {{host}}/rules?page=1&per_page=20
+POST {{host}}/rules
+Content-Type: {{json}}
+
+{"original_text":"si un grip rojo lo provee Inversiones Guerrero y Malusa, es el mismo","structured_condition":{"type":"supplier_equivalence","match":{"keywords":["grip","rojo"],"attributes":{"color":"rojo","type":"grip"}},"suppliers":["Inversiones Guerrero","Malusa"],"action":"merge_to_canonical","confidence":1.0},"supplier_names":["Inversiones Guerrero","Malusa"],"active":true}
+
+GET {{host}}/rules/1
+PATCH {{host}}/rules/1
+Content-Type: {{json}}
+
+{"active":false}
+
+### Agente
+POST {{host}}/agent/chat
+Content-Type: {{json}}
+
+{"message":"Dime qué productos se repiten con Guerrero","session_id":"demo"}
+
+POST {{host}}/agent/confirm
+Content-Type: {{json}}
+
+{"action_id":1,"approved":true}
+
+GET {{host}}/agent/actions?page=1&per_page=20
+
+### Reportes
+GET {{host}}/reports/inventory?category=manillar
+GET {{host}}/reports/price-comparison?canonical_product_id=1
+GET {{host}}/reports/purchase-suggestions?budget=500000&categories=manillar&categories=frenos

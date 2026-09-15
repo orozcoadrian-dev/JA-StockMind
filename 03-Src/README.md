@@ -1,114 +1,139 @@
-# Imperio Motos SAS - AI Inventory Agent PoC
+# StockMind
 
-Este repositorio contiene un PoC funcional para un sistema agéntico de gestión de inventarios con detección de SKUs duplicados entre proveedores.
+StockMind es un agente de inventario para un almacén de repuestos de moto en Cartagena. Los proveedores envían listas Excel con códigos, columnas y nombres distintos; por eso el mismo repuesto puede aparecer como `GRIP ROJO DEPORTIVO`, `Manubrio grip rojo` o `GRIPS ROJ. UNIV.`. El sistema conserva cada fila original, normaliza el nombre y calcula equivalencias con razones legibles.
 
-## Objetivo
-Desarrollar una prueba de concepto para un parcial de 6to semestre, con enfoque en:
-- Backend en Python
-- Agente IA semántico
-- Frontend moderno y responsivo
-- Flujo Human-in-the-Loop para revisión de inventarios ambiguos
+El flujo combina automatización y control humano: importa archivos, propone vínculos entre proveedores, permite confirmar o rechazar coincidencias, aprende reglas estructuradas y deja cada cambio auditado. El agente decide qué herramienta encadenar, pero nunca ejecuta una consolidación destructiva sin confirmación.
 
-## Estructura del proyecto
+## Requisitos
+
+- Python 3.11 o superior
+- Navegador moderno
+- PowerShell en Windows o shell compatible en Linux/macOS
+
+## Instalación limpia
+
+Desde la raíz `03-Src`:
+
+### Windows
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r Backend/requirements.txt
+```
+
+### Linux/macOS
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r Backend/requirements.txt
+```
+
+No se necesita una clave LLM para ejecutar importaciones, equivalencias, reportes o pruebas. Para activar chat con un proveedor OpenAI-compatible, define `LLM_API_KEY` y opcionalmente `LLM_API_URL` y `LLM_MODEL`.
+
+## Datos de demostración
+
+Genera cuatro listas realistas y carga sus productos en SQLite:
+
+```bash
+python demo/seed.py
+```
+
+El script produce:
+
+- `demo/guerrero_demo.xlsx`
+- `demo/malusa_demo.xlsx`
+- `demo/distrimotos_demo.xlsx`
+- `demo/partes_caribe_demo.xlsx`
+
+Cada archivo contiene 85 filas, encabezados en posiciones diferentes, nombres de columnas distintos, precios colombianos, filas vacías, un subtotal y productos exclusivos. Los cuatro incluyen el grip rojo bajo nombres distintos; también hay grip azul y grip rojo de 28 mm.
+
+El seed es idempotente: una segunda ejecución no duplica productos y recalcula las sugerencias pendientes.
+
+## Ejecutar el sistema
+
+Terminal 1, backend:
+
+```bash
+python -m uvicorn Backend.app:app --reload --host 127.0.0.1 --port 8000
+```
+
+Terminal 2, frontend:
+
+```bash
+python -m http.server 5501 --directory Frontend
+```
+
+Abre `http://127.0.0.1:5501`. Si el puerto está ocupado, usa otro y agrégalo a `allow_origins` en `Backend/app.py`.
+
+La documentación interactiva está en `http://127.0.0.1:8000/api/docs`. También hay ejemplos listos para REST Client en [docs/api.http](docs/api.http).
+
+## Pruebas y cobertura
+
+Suite completa:
+
+```bash
+python -m unittest discover -s Backend/Tests -v
+```
+
+Cobertura de servicios y herramientas:
+
+```bash
+python -m coverage erase
+python -m coverage run --source=Backend/Services,Backend/Agent -m unittest discover -s Backend/Tests
+python -m coverage report -m
+```
+
+Para ver específicamente las herramientas del agente:
+
+```bash
+python -m coverage report -m Backend/Agent/tools.py
+```
+
+La medición validada entrega 87% en `Backend/Agent/tools.py` y 82% en el conjunto de servicios y agente. Las pruebas cubren contratos, precios colombianos, normalización, importación idempotente, equivalencias rojo/azul/medida, reglas naturales, confirmación retroactiva, herramientas, API REST y datos demo.
+
+## Estructura
 
 ```text
 03-Src/
 ├── Backend/
-│   ├── Agent/
-│   │   └── agent.py
-│   ├── Api/
-│   │   └── __init__.py
-│   ├── app.py
-│   ├── requirements.txt
-│   └── ...
-├── Frontend/
-│   ├── Assets/
-│   │   ├── Js/
-│   │   │   └── script.js
-│   │   └── styles.css
-│   ├── Pages/
-│   │   ├── inventario.html
-│   │   └── reportes.html
-│   ├── index.html
-│   └── ...
-├── Docs/
-│   └── agent.md
-├── README.md
-└── .gitignore
+│   ├── Agent/       loop, memoria, prompt y herramientas
+│   ├── Api/         rutas legacy, agente, matches y REST v1
+│   ├── Models/      entidades SQLAlchemy y contratos Pydantic
+│   ├── Services/    Excel, normalización, matcher y consolidación
+│   └── Tests/       pruebas unitarias y de integración
+├── demo/            seed.py y cuatro Excel de demostración
+├── docs/            contratos, arquitectura, OpenAPI, guion y requests
+├── Frontend/        HTML, CSS y JavaScript sin framework
+└── agent.md         contexto operativo del proyecto
 ```
 
-## Requisitos previos
-- Python 3.10+
-- Navegador moderno
-- Git
+## API canónica
 
-## Instalación
+Todas las rutas nuevas usan `/api/v1` y respuestas `{ "data": ..., "meta": ... }`:
 
-```bash
-cd 03-Src
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r Backend/requirements.txt
-```
+- `/suppliers`: proveedores y CRUD.
+- `/imports`: carga e historial de archivos.
+- `/products`: productos crudos normalizados.
+- `/canonical-products`: catálogo consolidado.
+- `/matches`: sugerencias pendientes, confirmación y rechazo.
+- `/rules`: reglas de equivalencia.
+- `/agent`: chat, confirmaciones y auditoría.
+- `/reports`: inventario, precios y compras.
 
-## Ejecución del backend
+Los errores usan `{ "error": { "code", "message", "details" } }`. Las rutas `/api/...` anteriores se conservan como aliases legacy.
 
-```bash
-cd 03-Src
-uvicorn Backend.app:app --reload --host 0.0.0.0 --port 8000
-```
+## Flujo recomendado para la sustentación
 
-## Uso del frontend
+1. Ejecutar `python demo/seed.py`.
+2. Abrir el panel y mostrar que el catálogo parte de datos persistidos.
+3. Revisar coincidencias y explicar por qué el grip rojo coincide y el azul no.
+4. Importar una lista adicional desde la pantalla de importación.
+5. Pedir al agente una comparación de proveedores.
+6. Dictar una regla y mostrar su confirmación antes de aplicarla.
+7. Abrir reportes y cerrar con una sugerencia de compra basada en stock real.
 
-1. Abre `Frontend/index.html` en tu navegador.
-2. Navega a la pantalla de inventario haciendo clic en el botón correspondiente.
-3. En la vista de inventario, presiona `Ejecutar Agente` para comparar SKUs.
-
-## API principal
-
-### GET `/health`
-Verifica que el servicio esté activo.
-
-### GET `/api/ambiguous-skus`
-Devuelve una lista de inventarios ambiguos de ejemplo.
-
-### POST `/api/compare-skus`
-Recibe:
-
-```json
-{
-  "sku_a": "Manilar rojo",
-  "sku_b": "Grip rojo"
-}
-```
-
-Respuesta esperada:
-
-```json
-{
-  "status": "success",
-  "analysis": {
-    "similarity": 92.34,
-    "confidence": 92.34,
-    "recommendation": "Fusionar",
-    "message": "Se recomienda fusionar los SKUs por alta similitud semántica."
-  }
-}
-```
-
-## Ejemplo de primer commit
-
-```bash
-git add .
-git commit -m "feat: initialize imperio motos inventory agent poc"
-```
-
-## Notes académicos
-Este PoC está orientado a demostrar una arquitectura limpia, un agente semántico simplificado y una interfaz útil para revisión humana. El proyecto puede extenderse con:
-- Base de datos
-- Autenticación
-- Validaciones más avanzadas de similitud
-- Integración con modelos de embeddings o NLP
-
-## Autoría
-Proyecto de Adrián Orozco y Jaber Vargas
+La explicación ampliada está en [docs/arquitectura.md](docs/arquitectura.md) y el guion cronometrado en [docs/demo.md](docs/demo.md).

@@ -3,94 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Inventario - Imperio Motos SAS</title>
+    <title>Inventario / StockMind</title>
     <link rel="stylesheet" href="../Assets/styles.css" />
   </head>
-  <body>
-    <div class="page-shell dashboard-shell">
-      <header class="site-header dashboard-header">
-        <nav class="nav container">
-          <div class="brand">
-            <span class="brand-mark">IM</span>
-            <span>Imperio Motos SAS</span>
-          </div>
-          <div class="nav-links">
-            <a href="../index.html">Inicio</a>
-            <a href="inventario.html">Inventarios</a>
-            <a href="reportes.html">Reportes</a>
-          </div>
-          <button class="btn btn-primary" id="loadSkusButton">Actualizar</button>
-        </nav>
-      </header>
-
-      <main class="dashboard container">
-        <aside class="sidebar-panel">
-          <h2>Panel</h2>
-          <ul>
-            <li class="active">Inventario ambiguo</li>
-            <li>SKU De-duplicados</li>
-            <li>Historial</li>
-            <li>Configuración</li>
-          </ul>
-
-          <div class="sidebar-box">
-            <h3>Resumen rápido</h3>
-            <div class="mini-stat">
-              <span>Stock crítico</span>
-              <strong id="stockCriticalValue">0</strong>
-            </div>
-            <div class="mini-stat">
-              <span>Revisiones hoy</span>
-              <strong id="reviewsTodayValue">0</strong>
-            </div>
-          </div>
-        </aside>
-
-        <section class="inventory-panel">
-          <div class="panel-topbar">
-            <div>
-              <p class="eyebrow">Monitoreo</p>
-              <h1>Inventario con revisión humana</h1>
-            </div>
-            <button class="btn btn-primary" id="runAgentButton">Ejecutar Agente</button>
-          </div>
-
-          <div class="summary-cards">
-            <div class="summary-card">
-              <span>Items ambiguos</span>
-              <strong id="ambiguousCount">0</strong>
-            </div>
-            <div class="summary-card">
-              <span>Con similitud alta</span>
-              <strong id="highConfidenceCount">0</strong>
-            </div>
-            <div class="summary-card">
-              <span>Acciones sugeridas</span>
-              <strong id="suggestedActionsCount">0</strong>
-            </div>
-          </div>
-
-          <div class="table-card">
-            <table>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Proveedor A</th>
-                  <th>SKU A</th>
-                  <th>Proveedor B</th>
-                  <th>SKU B</th>
-                  <th>Motivo</th>
-                  <th>Resultado</th>
-                  <th>Acción</th>
-                </tr>
-              </thead>
-              <tbody id="inventoryTableBody"></tbody>
-            </table>
-          </div>
-        </section>
+  <body data-page="inventory">
+    <div class="app-shell">
+      <aside class="side-rail"><a class="brand" href="../index.html"><span class="brand-mark">SM</span><span>STOCK<span class="brand-accent">MIND</span></span></a><p class="rail-caption">CONTROL DE REPUESTOS</p><nav class="main-nav"><a class="nav-item" href="../index.html"><span class="nav-icon">⌂</span>Panel</a><a class="nav-item" href="importar.html"><span class="nav-icon">↑</span>Importar lista</a><a class="nav-item active" href="inventario.html"><span class="nav-icon">▦</span>Inventario</a><a class="nav-item" href="coincidencias.html"><span class="nav-icon">≈</span>Coincidencias</a><a class="nav-item" href="agente.html"><span class="nav-icon">✦</span>Agente</a><a class="nav-item" href="reportes.html"><span class="nav-icon">↗</span>Reportes</a></nav><div class="rail-footer"><span class="live-dot"></span><span>API conectada</span><small>v1 · Cartagena</small></div></aside>
+      <main class="main-content"><header class="topbar"><div><p class="kicker">CATÁLOGO / PRODUCTOS CANÓNICOS</p><h1>Inventario consolidado</h1></div><a class="button button-primary" href="importar.html">＋ Nueva lista</a></header>
+        <div class="page-frame"><div class="page-heading"><div><p class="kicker">LECTURA DENSA</p><p>Abre una fila para revisar cada referencia de proveedor y comparar precios.</p></div></div>
+          <div class="toolbar"><input id="inventorySearch" class="field search-field" type="search" placeholder="Buscar producto o categoría" aria-label="Buscar producto o categoría" /><select id="inventoryCategory" class="field" aria-label="Filtrar categoría"><option value="">Todas las categorías</option></select><select id="inventorySort" class="field" aria-label="Ordenar"><option value="id">Más recientes</option><option value="name">Nombre</option><option value="-price">Precio mayor</option></select><button id="inventoryRefresh" class="button button-quiet">Actualizar</button></div>
+          <div class="table-wrap"><table><thead><tr><th></th><th>Producto canónico</th><th>Categoría</th><th>Atributos</th><th>Stock</th><th>Proveedores</th></tr></thead><tbody id="inventoryBody"><tr><td colspan="6" class="empty-state">Cargando catálogo…</td></tr></tbody></table></div>
+        </div>
       </main>
-    </div>
-
-    <script src="../Assets/Js/script.js"></script>
+    </div><script src="../Assets/Js/script.js"></script>
   </body>
 </html>

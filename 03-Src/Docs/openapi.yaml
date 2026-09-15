@@ -1,0 +1,100 @@
+openapi: 3.0.3
+info:
+  title: MotoStock API
+  version: 1.0.0
+  description: API REST versionada para importar, consolidar y consultar repuestos de moto.
+servers:
+  - url: http://127.0.0.1:8000/api/v1
+paths:
+  /health:
+    get:
+      tags: [Salud]
+      responses:
+        '200': {description: Servicio disponible}
+  /suppliers:
+    get:
+      tags: [Proveedores]
+      parameters: [{$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses: {'200': {$ref: '#/components/responses/Success'}}
+    post:
+      tags: [Proveedores]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SupplierInput'}}}}
+      responses: {'201': {$ref: '#/components/responses/Created'}, '409': {$ref: '#/components/responses/Error'}}
+  /suppliers/{supplier_id}:
+    parameters: [{name: supplier_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Proveedores], responses: {'200': {$ref: '#/components/responses/Success'}, '404': {$ref: '#/components/responses/Error'}}}
+    patch: {tags: [Proveedores], requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SupplierInput'}}}}, responses: {'200': {$ref: '#/components/responses/Success'}, '404': {$ref: '#/components/responses/Error'}}}
+    delete: {tags: [Proveedores], responses: {'204': {description: Eliminado}, '404': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}}}
+  /imports:
+    post:
+      tags: [Importaciones]
+      requestBody: {required: true, content: {multipart/form-data: {schema: {type: object, required: [file, supplier_id], properties: {file: {type: string, format: binary}, supplier_id: {type: integer}}}}}}
+      responses: {'201': {$ref: '#/components/responses/Created'}, '413': {$ref: '#/components/responses/Error'}, '422': {$ref: '#/components/responses/Error'}}
+    get:
+      tags: [Importaciones]
+      parameters: [{$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}]
+      responses: {'200': {$ref: '#/components/responses/Success'}}
+  /imports/{import_id}:
+    get:
+      tags: [Importaciones]
+      parameters: [{name: import_id, in: path, required: true, schema: {type: integer}}]
+      responses: {'200': {$ref: '#/components/responses/Success'}, '404': {$ref: '#/components/responses/Error'}}
+  /products:
+    get:
+      tags: [Productos]
+      parameters: [{$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}, {name: supplier_id, in: query, schema: {type: integer}}, {name: category, in: query, schema: {type: string}}, {name: sort, in: query, schema: {type: string, example: -price}}]
+      responses: {'200': {$ref: '#/components/responses/Success'}}
+  /products/{product_id}:
+    get:
+      tags: [Productos]
+      parameters: [{name: product_id, in: path, required: true, schema: {type: integer}}]
+      responses: {'200': {$ref: '#/components/responses/Success'}, '404': {$ref: '#/components/responses/Error'}}
+  /canonical-products:
+    get: {tags: [Catalogo], parameters: [{$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}], responses: {'200': {$ref: '#/components/responses/Success'}}}
+    post: {tags: [Catalogo], requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CanonicalInput'}}}}, responses: {'201': {$ref: '#/components/responses/Created'}}}
+  /canonical-products/{canonical_id}:
+    get: {tags: [Catalogo], parameters: [{name: canonical_id, in: path, required: true, schema: {type: integer}}], responses: {'200': {$ref: '#/components/responses/Success'}, '404': {$ref: '#/components/responses/Error'}}}
+    patch: {tags: [Catalogo], parameters: [{name: canonical_id, in: path, required: true, schema: {type: integer}}], requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CanonicalInput'}}}}, responses: {'200': {$ref: '#/components/responses/Success'}, '404': {$ref: '#/components/responses/Error'}}}
+  /canonical-products/{canonical_id}/suppliers:
+    get: {tags: [Catalogo], parameters: [{name: canonical_id, in: path, required: true, schema: {type: integer}}], responses: {'200': {$ref: '#/components/responses/Success'}, '404': {$ref: '#/components/responses/Error'}}}
+  /matches/suggest:
+    post: {tags: [Coincidencias], responses: {'200': {$ref: '#/components/responses/Success'}}}
+  /matches/pending:
+    get: {tags: [Coincidencias], parameters: [{$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}], responses: {'200': {$ref: '#/components/responses/Success'}}}
+  /matches/{suggestion_id}/confirm:
+    post: {tags: [Coincidencias], parameters: [{name: suggestion_id, in: path, required: true, schema: {type: integer}}], responses: {'200': {$ref: '#/components/responses/Success'}, '404': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}}}
+  /matches/{suggestion_id}/reject:
+    post: {tags: [Coincidencias], parameters: [{name: suggestion_id, in: path, required: true, schema: {type: integer}}], responses: {'200': {$ref: '#/components/responses/Success'}, '404': {$ref: '#/components/responses/Error'}}}
+  /rules:
+    get: {tags: [Reglas], parameters: [{$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}], responses: {'200': {$ref: '#/components/responses/Success'}}}
+    post: {tags: [Reglas], requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RuleInput'}}}}, responses: {'201': {$ref: '#/components/responses/Created'}, '422': {$ref: '#/components/responses/Error'}}}
+  /rules/{rule_id}:
+    get: {tags: [Reglas], parameters: [{name: rule_id, in: path, required: true, schema: {type: integer}}], responses: {'200': {$ref: '#/components/responses/Success'}, '404': {$ref: '#/components/responses/Error'}}}
+    patch: {tags: [Reglas], parameters: [{name: rule_id, in: path, required: true, schema: {type: integer}}], responses: {'200': {$ref: '#/components/responses/Success'}, '404': {$ref: '#/components/responses/Error'}}}
+    delete: {tags: [Reglas], parameters: [{name: rule_id, in: path, required: true, schema: {type: integer}}], responses: {'204': {description: Eliminado}, '404': {$ref: '#/components/responses/Error'}}}
+  /agent/chat:
+    post: {tags: [Agente], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [message], properties: {message: {type: string}, session_id: {type: string}}}}}}, responses: {'200': {$ref: '#/components/responses/Success'}, '429': {$ref: '#/components/responses/Error'}}}
+  /agent/confirm:
+    post: {tags: [Agente], responses: {'200': {$ref: '#/components/responses/Success'}, '404': {$ref: '#/components/responses/Error'}}}
+  /agent/actions:
+    get: {tags: [Agente], parameters: [{$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/PerPage'}], responses: {'200': {$ref: '#/components/responses/Success'}}}
+  /reports/inventory:
+    get: {tags: [Reportes], responses: {'200': {$ref: '#/components/responses/Success'}}}
+  /reports/price-comparison:
+    get: {tags: [Reportes], parameters: [{name: canonical_product_id, in: query, required: true, schema: {type: integer}}], responses: {'200': {$ref: '#/components/responses/Success'}, '404': {$ref: '#/components/responses/Error'}}}
+  /reports/purchase-suggestions:
+    get: {tags: [Reportes], responses: {'200': {$ref: '#/components/responses/Success'}}}
+components:
+  parameters:
+    Page: {name: page, in: query, schema: {type: integer, minimum: 1, default: 1}}
+    PerPage: {name: per_page, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+  schemas:
+    SupplierInput: {type: object, required: [name], properties: {name: {type: string}, nit: {type: string}, contact: {type: string}, active: {type: boolean}}}
+    CanonicalInput: {type: object, required: [name, category], properties: {name: {type: string}, category: {type: string}, attributes: {type: object}, stock_in_bodega: {type: integer}, minimum_stock: {type: integer}}}
+    RuleInput: {type: object, required: [original_text, structured_condition, supplier_names], properties: {original_text: {type: string}, structured_condition: {type: object}, supplier_names: {type: array, items: {type: string}}, active: {type: boolean}}}
+    Envelope: {type: object, properties: {data: {}, meta: {type: object}}}
+    Error: {type: object, required: [error], properties: {error: {type: object, properties: {code: {type: string}, message: {type: string}, details: {}}}}}
+  responses:
+    Success: {description: Operación exitosa, content: {application/json: {schema: {$ref: '#/components/schemas/Envelope'}}}}
+    Created: {description: Recurso creado, headers: {Location: {schema: {type: string}}}, content: {application/json: {schema: {$ref: '#/components/schemas/Envelope'}}}}
+    Error: {description: Error de API, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
