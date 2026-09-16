@@ -13,7 +13,7 @@ class BaseConfig:
     APP_ENV = "base"
 
     SECRET_KEY = os.getenv("SECRET_KEY") or "dev-secret-key-change-me"
-    DATABASE_URL = os.getenv("DATABASE_URL") or "sqlite:///app.db"
+    DATABASE_URL = os.getenv("DATABASE_URL") or f"sqlite:///{BASE_DIR / 'database' / 'motostock.db'}"
     LLM_API_KEY = os.getenv("LLM_API_KEY") or "dev-llm-api-key"
     MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB") or 10)
     FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN") or "http://127.0.0.1:5500"
