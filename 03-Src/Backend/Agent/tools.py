@@ -114,7 +114,7 @@ def _rule_from_text(text: str) -> dict:
 def _suggest_for_products(db, products: list[Product]) -> list[dict]:
     suggestions = []
     for index, product in enumerate(products):
-        for candidate, score, reasons in find_candidates(product, products[index + 1:]):
+        for candidate, score, reasons in find_candidates(product, products[index + 1:], db=db):
             first_id, second_id = sorted((product.id, candidate.id))
             row = db.scalar(select(MatchSuggestion).where(MatchSuggestion.product_id == first_id, MatchSuggestion.candidate_product_id == second_id))
             if row is None:
@@ -126,7 +126,7 @@ def _suggest_for_products(db, products: list[Product]) -> list[dict]:
 
 def _execute(name: str, params: BaseModel, db, confirmed: bool = False) -> dict:
     if name == "import_excel":
-        data = import_excel_file(Path(params.file_id), params.supplier_id)
+        data = import_excel_file(Path(params.file_id), params.supplier_id, db)
         return {"summary": f"Se importaron {data['imported_rows']} filas.", "data": data}
     if name == "search_products":
         query = f"%{normalize_name(params.query)}%"

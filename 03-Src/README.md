@@ -57,9 +57,12 @@ El seed es idempotente: una segunda ejecución no duplica productos y recalcula 
 
 Terminal 1, backend:
 
-```bash
-python -m uvicorn Backend.app:app --reload --host 127.0.0.1 --port 8000
+```powershell
+$env:PYTHONPATH = ".\Backend"
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
+
+En Linux/macOS, usa `PYTHONPATH=Backend python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000` desde `03-Src`.
 
 Terminal 2, frontend:
 
@@ -67,9 +70,9 @@ Terminal 2, frontend:
 python -m http.server 5501 --directory Frontend
 ```
 
-Abre `http://127.0.0.1:5501`. Si el puerto está ocupado, usa otro y agrégalo a `allow_origins` en `Backend/app.py`.
+Abre `http://127.0.0.1:5501`. Si el puerto está ocupado, usa otro y agrégalo a `CORS_ORIGINS` en `Backend/.env`.
 
-La documentación interactiva está en `http://127.0.0.1:8000/api/docs`. También hay ejemplos listos para REST Client en [docs/api.http](docs/api.http).
+La documentación interactiva está en `http://127.0.0.1:8000/docs` y `/redoc`. Los ejemplos REST Client están en [Backend/requests.http](Backend/requests.http).
 
 ## Pruebas y cobertura
 

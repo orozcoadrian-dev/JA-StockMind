@@ -105,16 +105,6 @@ def rule_data(item: EquivalenceRule) -> dict:
     return {"id": item.id, "original_text": item.original_text, "structured_condition": item.structured_condition, "supplier_names": item.supplier_names, "active": item.active, "created_at": item.created_at.isoformat(), "applied_count": item.applied_count}
 
 
-@router.get("/health", tags=["health"])
-def api_health():
-    db = SessionLocal()
-    try:
-        db.execute(select(1))
-        return {"data": {"status": "ok", "version": "v1", "database": "ok"}, "meta": {}}
-    finally:
-        db.close()
-
-
 @router.get("/suppliers")
 def list_suppliers(page_params_value: tuple[int, int] = Depends(page_params)):
     page, per_page = page_params_value
@@ -197,7 +187,7 @@ async def create_import(request: Request, file: UploadFile = File(...), supplier
         if filename.lower().rsplit(".", 1)[-1] not in {"xlsx", "xls", "csv"}:
             raise HTTPException(status_code=422, detail="La extensión del archivo no es válida.")
         stored = _save_uploaded_file(file.file, filename)
-        summary = import_excel_file(stored, supplier_id)
+        summary = import_excel_file(stored, supplier_id, db)
         record = ImportRecord(supplier_id=supplier_id, filename=filename, stored_file_path=stored, summary=summary)
         db.add(record)
         db.commit()

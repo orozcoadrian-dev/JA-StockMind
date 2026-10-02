@@ -4,6 +4,10 @@ import re
 from difflib import SequenceMatcher
 from typing import Iterable
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.models import CanonicalProduct, LinkStatus, Origin, ProductLink
 from Backend.Services.normalizer import extract_attributes, normalize_name
 
 AUTO_THRESHOLD = 0.90
@@ -69,7 +73,14 @@ def compare_products(product, other) -> tuple[float, list[str]]:
     price_score = _price_similarity(float(product.unit_price), float(other.unit_price))
     reasons.append(f"Cercanía de precio: {price_score:.0%}.")
 
-    same_category = bool(product.category and other.category and product.category.lower() == other.category.lower())
+    left_category = getattr(product, "category", None)
+    right_category = getattr(other, "category", None)
+    left_category_id = getattr(product, "category_id", None)
+    right_category_id = getattr(other, "category_id", None)
+    same_category = bool(
+        (left_category and right_category and normalize_name(left_category) == normalize_name(right_category))
+        or (left_category_id and left_category_id == right_category_id)
+    )
     category_score = 1.0 if same_category else 0.0
     reasons.append("Misma categoría." if same_category else "Categorías diferentes.")
 
@@ -90,12 +101,54 @@ def decision_for_score(score: float) -> str:
     return "discard"
 
 
-def find_candidates(product, candidates: Iterable | None = None) -> list[tuple[object, float, list[str]]]:
-    """Compara un producto contra productos candidatos de otro proveedor.
+def _persist_pending_match(db: Session, product, candidate, confidence: float, reasons: list[str]) -> None:
+    source_canonical_ids = set(db.scalars(select(ProductLink.canonical_product_id).where(
+        ProductLink.product_id == product.id,
+        ProductLink.status == LinkStatus.PENDING,
+    )).all())
+    candidate_canonical_ids = set(db.scalars(select(ProductLink.canonical_product_id).where(
+        ProductLink.product_id == candidate.id,
+        ProductLink.status == LinkStatus.PENDING,
+    )).all())
+    shared_ids = source_canonical_ids & candidate_canonical_ids
+    canonical = db.get(CanonicalProduct, min(shared_ids)) if shared_ids else None
+    if canonical is None:
+        name = choose_match_name(product, candidate)
+        category_ids = [value for value in (getattr(product, "category_id", None), getattr(candidate, "category_id", None)) if value]
+        canonical = CanonicalProduct(
+            canonical_name=name,
+            category_id=category_ids[0] if category_ids and len(set(category_ids)) == 1 else None,
+            attributes=extract_attributes(name),
+        )
+        db.add(canonical)
+        db.flush()
 
-    La capa de persistencia puede pasar aquí la consulta ya filtrada; mantener esta
-    función pura facilita probar el motor sin abrir una sesión de base de datos.
-    """
+    for item in (product, candidate):
+        link = db.scalar(select(ProductLink).where(
+            ProductLink.product_id == item.id,
+            ProductLink.canonical_product_id == canonical.id,
+        ))
+        if link is None:
+            db.add(ProductLink(
+                product_id=item.id,
+                canonical_product_id=canonical.id,
+                confidence=confidence,
+                origin=Origin.AGENT_SUGGESTION,
+                status=LinkStatus.PENDING,
+                reasons=reasons,
+            ))
+
+
+def choose_match_name(product, candidate) -> str:
+    return max((product.raw_name.strip(), candidate.raw_name.strip()), key=lambda name: (len(name.split()), len(name)))
+
+
+def find_candidates(
+    product,
+    candidates: Iterable | None = None,
+    db: Session | None = None,
+) -> list[tuple[object, float, list[str]]]:
+    """Compare supplier products and persist automatic or review decisions when given a session."""
     candidates = candidates or []
     results = []
     for candidate in candidates:
@@ -104,5 +157,8 @@ def find_candidates(product, candidates: Iterable | None = None) -> list[tuple[o
         score, reasons = compare_products(product, candidate)
         decision = decision_for_score(score)
         if decision != "discard":
-            results.append((candidate, round(score, 4), reasons))
+            rounded_score = round(score, 4)
+            results.append((candidate, rounded_score, reasons))
+            if db is not None and decision == "review":
+                _persist_pending_match(db, product, candidate, rounded_score, reasons)
     return sorted(results, key=lambda item: item[1], reverse=True)

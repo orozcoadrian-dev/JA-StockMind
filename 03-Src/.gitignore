@@ -5,6 +5,7 @@ venv/
 .env
 *.db
 Backend/uploads/*
+Backend/backend.log
 .coverage
 htmlcov/
 .pytest_cache/

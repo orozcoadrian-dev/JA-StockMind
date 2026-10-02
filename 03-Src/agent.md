@@ -73,8 +73,10 @@ El agente debe:
 ---
 
 ## Stack previsto
-- Backend: Python 3.11 + Flask
-- Datos: SQLite vía SQLAlchemy
+- Backend: Python 3.11 + FastAPI + Uvicorn
+- Datos: MySQL (utf8mb4, InnoDB) vía SQLAlchemy 2.x con el driver PyMySQL
+- Validación: Pydantic v2
+- Configuración: pydantic-settings leyendo .env
 - Excel: pandas + openpyxl
 - API: REST con JSON
 - Frontend: HTML + CSS + JavaScript sin framework (fetch contra la API)
@@ -101,6 +103,9 @@ El agente debe:
 
 ## Estado del proyecto
 ### Estado actual
+- Esqueleto FastAPI creado en `Backend/app/` con health en `/api/v1/health`, CORS por entorno, handlers JSON de error y límite de subida.
+- La conexión MySQL está configurada con SQLAlchemy/PyMySQL, pero la verificación local de `check_db.py` está pendiente: no existe `Backend/.env` y el intento actual no alcanzó MySQL.
+- El entrypoint monolítico `Backend/app.py` fue reemplazado por `Backend/app/main.py`; health se verificó con sesiones de prueba, y queda pendiente comprobarlo contra MySQL real.
 - Se ha definido el contexto del dominio y la necesidad del sistema.
 - Se identificó el problema principal: duplicidad de registros y falta de estandarización entre proveedores.
 - Se estableció la arquitectura base prevista y las tecnologías principales.
@@ -113,10 +118,10 @@ El agente debe:
 - El agente agéntico está implementado en `Backend/Agent/`: herramientas validadas, prompt de sistema, memoria por sesión y loop de hasta ocho iteraciones.
 - Las herramientas registran cada ejecución en `AgentAction` y las operaciones destructivas esperan confirmación explícita.
 - Las reglas creadas por lenguaje natural se muestran estructuradas, esperan confirmación, se persisten y se aplican retroactivamente.
-- Los endpoints del agente están disponibles en `/api/agent/chat`, `/api/agent/confirm` y `/api/agent/actions`.
+- Los endpoints del agente están disponibles en `/api/v1/agent/chat`, `/api/v1/agent/confirm` y `/api/v1/agent/actions`.
 - La API REST versionada está disponible bajo `/api/v1`, con CRUD de proveedores, importaciones, productos, catálogo, reglas, coincidencias, agente y reportes.
 - Las respuestas versionadas usan `data/meta` en éxito y `error {code, message, details}` en fallos; los listados incluyen paginación.
-- OpenAPI está servido en `/api/docs` y documentado en `docs/openapi.yaml`; los ejemplos ejecutables están en `docs/api.http`.
+- OpenAPI se genera en `/docs` y `/redoc`; los ejemplos ejecutables por endpoint están en `Backend/requests.http`.
 - Se añadieron rate limits para imports y chat, y pruebas HTTP de 404, 422, 201/Location, 204, PATCH parcial y paginación.
 - La interfaz web operativa está implementada en `Frontend/`: panel, importación, inventario, coincidencias, agente y reportes.
 - El frontend consume `/api/v1` sin datos simulados, conserva estados vacíos y muestra progreso real al subir archivos.
@@ -135,8 +140,11 @@ El agente debe:
 ---
 
 ## Decisiones tomadas
-- Se eligió Flask como backend porque el proyecto requiere un flujo sencillo, legible y apropiado para un PoC y evolución temprana.
-- Se eligió SQLite con SQLAlchemy para facilitar desarrollo rápido, trazabilidad local y persistencia básica sin complejidad de infraestructura.
+- Se eligió FastAPI en vez de Flask por su validación y documentación automáticas, además del tipado.
+- Se eligió MySQL en vez de SQLite para permitir acceso concurrente y trabajar con datos reales del almacén.
+- Se eligió SQLAlchemy síncrono con PyMySQL porque pandas y openpyxl son síncronos; un driver asíncrono añadiría complejidad sin beneficio aquí.
+- El script SQL es la fuente de verdad del esquema; los modelos se escriben para calzar con él y no se usa `create_all()`.
+- Se conservan los contratos de éxito `{"data","meta"}`, error `{"error":{...}}` y el prefijo `/api/v1` para que el frontend no cambie de contrato.
 - Se eligió pandas + openpyxl para manejar archivos Excel de proveedores con formatos distintos.
 - Se eligió HTML + CSS + JavaScript sin framework para mantener la interfaz simple, ligera y compatible con fetch directo a la API.
 - Se optó por tool calling en el agente para que el sistema pueda ejecutar acciones reales sobre datos y no solo responder con texto.

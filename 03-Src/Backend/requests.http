@@ -1,0 +1,141 @@
+@host = http://127.0.0.1:8000/api/v1
+@json = application/json
+@supplierId = 1
+@productId = 1
+@canonicalId = 1
+@ruleId = 1
+@matchId = 1
+@importId = 1
+@actionId = 1
+
+### Salud
+GET {{host}}/health
+
+### Proveedores: listar
+GET {{host}}/suppliers?page=1&per_page=20
+
+### Proveedores: crear
+POST {{host}}/suppliers
+Content-Type: {{json}}
+
+{"name":"Proveedor REST Client","nit":"9001234567","contact":"compras@example.test","active":true}
+
+### Proveedores: obtener
+GET {{host}}/suppliers/{{supplierId}}
+
+### Proveedores: actualizar parcialmente
+PATCH {{host}}/suppliers/{{supplierId}}
+Content-Type: {{json}}
+
+{"contact":"contacto actualizado"}
+
+### Proveedores: eliminar
+DELETE {{host}}/suppliers/{{supplierId}}
+
+### Importaciones: cargar Excel .xlsx
+POST {{host}}/imports
+Content-Type: multipart/form-data; boundary=stockmind
+
+--stockmind
+Content-Disposition: form-data; name="supplier_id"
+
+{{supplierId}}
+--stockmind
+Content-Disposition: form-data; name="file"; filename="guerrero_grips.xlsx"
+Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+
+< ./Tests/fixtures/guerrero_grips.xlsx
+--stockmind--
+
+### Importaciones: listar
+GET {{host}}/imports?page=1&per_page=20&supplier_id={{supplierId}}
+
+### Importaciones: obtener
+GET {{host}}/imports/{{importId}}
+
+### Productos: listar con filtros y orden
+GET {{host}}/products?page=1&per_page=20&supplier_id={{supplierId}}&category=Frenos&sort=-price
+
+### Productos: obtener
+GET {{host}}/products/{{productId}}
+
+### Catálogo: listar
+GET {{host}}/canonical-products?page=1&per_page=20
+
+### Catálogo: crear
+POST {{host}}/canonical-products
+Content-Type: {{json}}
+
+{"name":"Pastilla de freno delantera","category":"Frenos","attributes":{"type":"pastilla"},"stock_in_bodega":0,"minimum_stock":5}
+
+### Catálogo: obtener
+GET {{host}}/canonical-products/{{canonicalId}}
+
+### Catálogo: actualizar parcialmente
+PATCH {{host}}/canonical-products/{{canonicalId}}
+Content-Type: {{json}}
+
+{"stock_in_bodega":4}
+
+### Catálogo: proveedores asociados
+GET {{host}}/canonical-products/{{canonicalId}}/suppliers
+
+### Coincidencias: generar sugerencias
+POST {{host}}/matches/suggest
+
+### Coincidencias: pendientes
+GET {{host}}/matches/pending?page=1&per_page=20
+
+### Coincidencias: confirmar
+POST {{host}}/matches/{{matchId}}/confirm
+
+### Coincidencias: rechazar
+POST {{host}}/matches/{{matchId}}/reject
+Content-Type: {{json}}
+
+{"create_exclusion_rule":true,"original_text":"No fusionar referencias de freno incompatibles"}
+
+### Reglas: listar
+GET {{host}}/rules?page=1&per_page=20
+
+### Reglas: crear
+POST {{host}}/rules
+Content-Type: {{json}}
+
+{"original_text":"Si un grip rojo lo provee Guerrero y Malusa, es el mismo","structured_condition":{"type":"equivalence","match":{"keywords":["grip","rojo"],"attributes":{"color":"rojo"}},"suppliers":["Inversiones Guerrero","Malusa"],"action":"merge_to_canonical"},"supplier_names":["Inversiones Guerrero","Malusa"],"active":true}
+
+### Reglas: obtener
+GET {{host}}/rules/{{ruleId}}
+
+### Reglas: actualizar parcialmente
+PATCH {{host}}/rules/{{ruleId}}
+Content-Type: {{json}}
+
+{"active":false}
+
+### Reglas: eliminar
+DELETE {{host}}/rules/{{ruleId}}
+
+### Agente: conversar
+POST {{host}}/agent/chat
+Content-Type: {{json}}
+
+{"message":"¿Qué productos se repiten con Guerrero?","session_id":"demo"}
+
+### Agente: confirmar acción
+POST {{host}}/agent/confirm
+Content-Type: {{json}}
+
+{"action_id":{{actionId}},"approved":true}
+
+### Agente: listar acciones
+GET {{host}}/agent/actions?page=1&per_page=20
+
+### Reportes: inventario
+GET {{host}}/reports/inventory?category=Frenos
+
+### Reportes: comparación de precios
+GET {{host}}/reports/price-comparison?canonical_product_id={{canonicalId}}
+
+### Reportes: sugerencias de compra
+GET {{host}}/reports/purchase-suggestions?budget=500000&categories=Frenos&categories=Transmisión

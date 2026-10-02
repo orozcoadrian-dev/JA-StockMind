@@ -54,7 +54,7 @@ La respuesta debe apoyarse en precios persistidos, no en una recomendación inve
 
 ## 7:15-8:00 / Cierre técnico
 
-Mostrar `/api/docs` y resumir:
+Mostrar `/docs` y resumir:
 
 - API versionada y paginada;
 - errores JSON uniformes;

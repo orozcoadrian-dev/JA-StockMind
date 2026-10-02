@@ -53,7 +53,7 @@ def suggest_matches():
         created = 0
         for index, product in enumerate(products):
             candidates = [candidate for candidate in products[index + 1:] if candidate.supplier_id != product.supplier_id]
-            for candidate, score, reasons in find_candidates(product, candidates):
+            for candidate, score, reasons in find_candidates(product, candidates, db=db):
                 first_id, second_id = sorted((product.id, candidate.id))
                 suggestion = db.scalar(select(MatchSuggestion).where(
                     MatchSuggestion.product_id == first_id,
