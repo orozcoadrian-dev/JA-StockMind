@@ -17,7 +17,7 @@ class ConversationMemory:
         removed = self._messages[:-self.max_messages]
         self._summary = " | ".join(f"{item['role']}: {str(item.get('content', ''))[:160]}" for item in removed[-6:])
         self._messages = self._messages[-self.max_messages:]
-{}
+
     def messages(self) -> list[dict]:
         if not self._summary:
             return list(self._messages)

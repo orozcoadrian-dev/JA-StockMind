@@ -180,6 +180,20 @@ def create_import(db: Session, supplier_id: int, filename: str, contents: bytes)
     stored_path = _save_uploaded_file(BytesIO(contents), filename)
     try:
         summary = import_excel_file(stored_path, supplier_id, db, original_filename=filename, stored_path=stored_path)
+    except ValueError as exc:
+        Path(stored_path).unlink(missing_ok=True)
+        raise APIServiceError(
+            422,
+            "El archivo Excel no contiene las columnas requeridas o no se pudo interpretar.",
+            {
+                "reason": str(exc),
+                "required_columns": [
+                    "Código, referencia o SKU",
+                    "Descripción o nombre del producto",
+                    "Precio, valor o costo",
+                ],
+            },
+        ) from exc
     except Exception:
         Path(stored_path).unlink(missing_ok=True)
         raise

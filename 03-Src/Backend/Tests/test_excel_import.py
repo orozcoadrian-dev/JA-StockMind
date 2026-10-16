@@ -1,10 +1,15 @@
 import os
 import unittest
+from io import BytesIO
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import Mock, patch
 
+from openpyxl import Workbook
 from sqlalchemy import func, select
 
 from app.models import Import, Product, Supplier
+from Backend.Services.api_v1 import APIServiceError, create_import
 from Backend.Services.excel_reader import read_excel_file
 from Backend.Services.importer import import_excel_file
 from Backend.Services.normalizer import extract_attributes, normalize_name, parse_price
@@ -31,6 +36,32 @@ class ExcelImportPipelineTest(unittest.TestCase):
         self.assertEqual(parse_price("$ 12.500"), 12500)
         self.assertEqual(parse_price("12.500,00"), 12500)
         self.assertEqual(extract_attributes("Grip rojo 22mm para moto")["color"], "rojo")
+
+    def test_import_without_price_column_returns_actionable_validation_error(self):
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.append(["Código", "Descripción"])
+        worksheet.append(["A-1", "Grip rojo"])
+        contents = BytesIO()
+        workbook.save(contents)
+        contents.seek(0)
+
+        with TemporaryDirectory() as directory:
+            stored_path = Path(directory) / "missing-price.xlsx"
+
+            def save_upload(file_like, original_name):
+                stored_path.write_bytes(file_like.read())
+                return str(stored_path)
+
+            with patch("Backend.Services.api_v1._save_uploaded_file", side_effect=save_upload):
+                with self.assertRaises(APIServiceError) as raised:
+                    create_import(Mock(get=Mock(return_value=object())), 1, stored_path.name, contents.getvalue())
+
+        self.assertEqual(raised.exception.status_code, 422)
+        self.assertIn("columnas requeridas", raised.exception.message)
+        self.assertIn("unit_price", raised.exception.details["reason"])
+        self.assertIn("Precio, valor o costo", raised.exception.details["required_columns"])
+        self.assertFalse(stored_path.exists())
 
     @unittest.skipUnless(
         RUN_MYSQL_INTEGRATION,
