@@ -4,6 +4,8 @@ StockMind es un agente de inventario para un almacén de repuestos de moto en Ca
 
 El flujo combina automatización y control humano: importa archivos, propone vínculos entre proveedores, permite confirmar o rechazar coincidencias, aprende reglas estructuradas y deja cada cambio auditado. El agente decide qué herramienta encadenar, pero nunca ejecuta una consolidación destructiva sin confirmación.
 
+El análisis reconoce descripciones de productos y colores en español o inglés, además de abreviaturas comunes como `NG` para negro. El dashboard actualiza las sugerencias al abrirse y permite repetir el análisis con **Analizar productos**; se compara el último lote importado con los demás proveedores en vez de recorrer todo el catálogo. En **Coincidencias**, cada pareja pendiente tiene la acción **Unificar productos**, que solicita confirmación y consolida únicamente los dos productos elegidos.
+
 ## Requisitos
 
 - Python 3.11 o superior

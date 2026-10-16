@@ -18,7 +18,9 @@ from app.models import (
     Category,
     EquivalenceRule,
     Import,
+    ImportStatus,
     LinkStatus,
+    Origin,
     Product,
     ProductLink,
     RuleType,
@@ -26,7 +28,13 @@ from app.models import (
 )
 from Backend.Services.consolidator import consolidate_products
 from Backend.Services.importer import _save_uploaded_file, import_excel_file
-from Backend.Services.matcher import find_candidates
+from Backend.Services.matcher import (
+    REVIEW_THRESHOLD,
+    _persist_pending_match,
+    compare_products,
+    iter_candidate_pairs,
+)
+from Backend.Services.normalizer import extract_attributes
 
 
 class APIServiceError(Exception):
@@ -303,11 +311,43 @@ def canonical_suppliers(db: Session, canonical_id: int) -> list[dict[str, Any]]:
 
 
 def suggest_matches(db: Session) -> list[dict[str, Any]]:
-    products = db.scalars(select(Product).order_by(Product.id)).all()
+    latest_import = db.scalar(
+        select(Import)
+        .where(Import.status == ImportStatus.COMPLETED, Import.rows_imported > 0)
+        .order_by(Import.created_at.desc(), Import.id.desc())
+        .limit(1)
+    )
+    if latest_import is None:
+        return []
+
+    source_products = db.scalars(
+        select(Product).where(Product.import_id == latest_import.id).order_by(Product.id)
+    ).all()
+    if not source_products:
+        return []
+
+    source_supplier_ids = {product.supplier_id for product in source_products}
+    other_products = db.scalars(
+        select(Product)
+        .where(Product.supplier_id.notin_(source_supplier_ids))
+        .order_by(Product.id)
+    ).all()
+    products = [*source_products, *other_products]
+    source_product_ids = {product.id for product in source_products}
     suggestions = []
-    for index, product in enumerate(products):
-        for candidate, score, reasons in find_candidates(product, products[index + 1 :], db=db):
-            suggestions.append({"product_id": product.id, "candidate_product_id": candidate.id, "score": score, "reasons": reasons, "status": "pending"})
+    for product, candidate in iter_candidate_pairs(products, source_product_ids):
+        score, reasons = compare_products(product, candidate)
+        if score < REVIEW_THRESHOLD:
+            continue
+        rounded_score = round(score, 4)
+        _persist_pending_match(db, product, candidate, rounded_score, reasons)
+        suggestions.append({
+            "product_id": product.id,
+            "candidate_product_id": candidate.id,
+            "score": rounded_score,
+            "reasons": reasons,
+            "status": "pending",
+        })
     db.commit()
     return suggestions
 
@@ -322,39 +362,99 @@ def _pending_link(db: Session, link_id: int) -> ProductLink:
 
 
 def list_pending_matches(db: Session, page: int, per_page: int):
-    query = select(ProductLink).where(ProductLink.status == LinkStatus.PENDING).order_by(ProductLink.created_at.desc())
-    rows, meta = _pagination(query, db, page, per_page)
+    links = db.scalars(
+        select(ProductLink)
+        .where(ProductLink.status == LinkStatus.PENDING)
+        .order_by(ProductLink.created_at.desc(), ProductLink.id.desc())
+    ).all()
     result = []
-    for link in rows:
+    seen_pairs: set[tuple[int, int]] = set()
+    for link in links:
         product = db.get(Product, link.product_id)
         candidate = db.scalar(
             select(Product).join(ProductLink, ProductLink.product_id == Product.id)
-            .where(ProductLink.canonical_product_id == link.canonical_product_id, Product.id != link.product_id)
+            .where(
+                ProductLink.canonical_product_id == link.canonical_product_id,
+                ProductLink.status == LinkStatus.PENDING,
+                Product.id != link.product_id,
+            )
+            .order_by(Product.id)
             .limit(1)
         )
+        if candidate is None:
+            continue
+        pair = tuple(sorted((product.id, candidate.id)))
+        if pair in seen_pairs:
+            continue
+        seen_pairs.add(pair)
         result.append({
             "id": link.id,
             "product": _product_data(db, product),
-            "candidate": _product_data(db, candidate) if candidate else _product_data(db, product),
+            "candidate": _product_data(db, candidate),
             "score": float(link.confidence),
             "reasons": link.reasons or [],
             "decision": "review",
             "status": link.status.value,
         })
-    return result, meta
+    total = len(result)
+    pages = math.ceil(total / per_page) if total else 0
+    start = (page - 1) * per_page
+    meta = {"total": total, "page": page, "per_page": per_page, "pages": pages}
+    return result[start:start + per_page], meta
 
 
-def confirm_match(db: Session, link_id: int) -> dict[str, Any]:
+def confirm_match(db: Session, link_id: int, candidate_product_id: int) -> dict[str, Any]:
     link = _pending_link(db, link_id)
     product = db.get(Product, link.product_id)
-    canonical_id = link.canonical_product_id
-    products = db.scalars(
-        select(Product).join(ProductLink, ProductLink.product_id == Product.id)
-        .where(ProductLink.canonical_product_id == canonical_id)
+    canonical_links = db.scalars(
+        select(ProductLink).where(
+            ProductLink.canonical_product_id == link.canonical_product_id,
+        )
     ).all()
-    canonical = consolidate_products(db, products or [product], float(link.confidence), origin="manual", confirmed_by="user")
+    candidate_link = next(
+        (
+            item for item in canonical_links
+            if item.product_id == candidate_product_id
+            and item.id != link.id
+            and item.status == LinkStatus.PENDING
+        ),
+        None,
+    )
+    if candidate_link is None:
+        raise APIServiceError(409, "El producto elegido ya no forma parte de esta sugerencia.")
+    candidate = db.get(Product, candidate_product_id)
+    products = [product, candidate]
+    canonical = (
+        db.get(CanonicalProduct, link.canonical_product_id)
+        if len(canonical_links) == 2
+        and all(item.status == LinkStatus.PENDING for item in canonical_links)
+        else None
+    )
+    if canonical is None:
+        canonical_name = max(
+            (item.raw_name.strip() for item in products),
+            key=lambda name: (len(name.split()), len(name)),
+        )
+        categories = [item.category_id for item in products if item.category_id is not None]
+        canonical = CanonicalProduct(
+            canonical_name=canonical_name,
+            category_id=categories[0] if len(set(categories)) == 1 else None,
+            attributes=extract_attributes(canonical_name),
+        )
+        db.add(canonical)
+        db.flush()
+
+    for pending_link in (link, candidate_link):
+        pending_link.canonical_product_id = canonical.id
+        pending_link.status = LinkStatus.CONFIRMED
+        pending_link.origin = Origin.MANUAL
+        pending_link.confidence = link.confidence
+        pending_link.confirmed_by = "user"
     db.commit()
-    return {"suggestion": {"id": link.id, "status": "confirmed"}, "canonical_product": _canonical_data(db, canonical)}
+    return {
+        "suggestion": {"id": link.id, "status": "confirmed"},
+        "canonical_product": _canonical_data(db, canonical),
+    }
 
 
 def reject_match(db: Session, link_id: int, payload: dict[str, Any] | None = None) -> dict[str, Any]:

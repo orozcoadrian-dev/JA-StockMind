@@ -64,6 +64,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .panel { min-width: 0; padding: 22px; background: white; border: 1px solid var(--line); box-shadow: var(--shadow); }
 .panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; margin-bottom: 18px; }
 .panel-heading h2 { margin: 5px 0 0; color: var(--negro); font: 600 27px/1 'Barlow Condensed', sans-serif; }
+.panel-heading p { margin: 7px 0 0; font-size: 12px; }
+.panel-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
 .text-link { color: var(--verde-hondo); font-size: 12px; font-weight: 700; text-decoration: none; }
 .text-link span { font-size: 17px; }
 .match-list { display: grid; gap: 9px; }

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from ..db.session import get_db
-from ..schemas.api import APIEnvelope, MatchDTO, MatchRejectRequest, responses
+from ..schemas.api import APIEnvelope, MatchConfirmRequest, MatchDTO, MatchRejectRequest, responses
 from Backend.Services import api_v1 as service
 
 
@@ -22,8 +22,8 @@ def suggest_matches(db: Session = Depends(get_db)):
 
 
 @router.post("/{suggestion_id}/confirm", response_model=APIEnvelope[dict], responses=responses(404, 409, 500))
-def confirm_match(suggestion_id: int, db: Session = Depends(get_db)):
-    return {"data": service.confirm_match(db, suggestion_id), "meta": {}}
+def confirm_match(suggestion_id: int, payload: MatchConfirmRequest, db: Session = Depends(get_db)):
+    return {"data": service.confirm_match(db, suggestion_id, payload.candidate_product_id), "meta": {}}
 
 
 @router.post("/{suggestion_id}/reject", response_model=APIEnvelope[dict], responses=responses(404, 409, 500))

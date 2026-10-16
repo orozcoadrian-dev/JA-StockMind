@@ -124,6 +124,10 @@ class MatchRejectRequest(BaseModel):
     original_text: str | None = Field(default=None, max_length=500)
 
 
+class MatchConfirmRequest(BaseModel):
+    candidate_product_id: int = Field(gt=0)
+
+
 class AgentChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=10000)
     session_id: str = Field(default="default", min_length=1, max_length=64)

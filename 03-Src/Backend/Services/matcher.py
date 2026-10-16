@@ -12,10 +12,100 @@ from Backend.Services.normalizer import extract_attributes, normalize_name
 
 AUTO_THRESHOLD = 0.90
 REVIEW_THRESHOLD = 0.65
+BLOCKING_MAX_FREQUENCY = 250
+BLOCKING_STOP_WORDS = {
+    "amarillo",
+    "azul",
+    "blanco",
+    "gris",
+    "marron",
+    "naranja",
+    "negro",
+    "rojo",
+    "rosado",
+    "verde",
+    "universal",
+    "original",
+    "generico",
+    "delantero",
+    "trasero",
+    "izquierdo",
+    "derecho",
+    "moto",
+    "motocicleta",
+    "de",
+    "del",
+    "la",
+    "el",
+    "para",
+    "con",
+    "sin",
+    "por",
+    "y",
+}
 
 
 def _tokens(value: str) -> set[str]:
     return set(re.findall(r"[a-z0-9]+", normalize_name(value)))
+
+
+def _blocking_tokens(product) -> set[str]:
+    name = product.raw_name or product.normalized_name
+    tokens = {
+        token
+        for token in _tokens(name)
+        if len(token) >= 3
+        and not token.isdigit()
+        and not re.fullmatch(r"\d+(?:mm|cm)", token)
+        and token not in BLOCKING_STOP_WORDS
+    }
+    attributes = extract_attributes(name)
+    product_type = attributes.get("type")
+    color = attributes.get("color")
+    measure = attributes.get("measure")
+    if product_type and color:
+        tokens.add(f"feature:{product_type}:color:{color}")
+    if product_type and measure:
+        tokens.add(f"feature:{product_type}:measure:{measure}")
+    return tokens
+
+
+def iter_candidate_pairs(products: Iterable, source_product_ids: set[int] | None = None):
+    products = list(products)
+    postings: dict[str, list] = {}
+    product_tokens = {}
+    for product in products:
+        tokens = _blocking_tokens(product)
+        product_tokens[product.id] = tokens
+        for token in tokens:
+            postings.setdefault(token, []).append(product)
+
+    sources = (
+        [product for product in products if product.id in source_product_ids]
+        if source_product_ids is not None
+        else products
+    )
+    products_by_id = {product.id: product for product in products}
+    for product in sources:
+        candidate_ids: set[int] = set()
+        for token in product_tokens[product.id]:
+            matches = postings[token]
+            if len(matches) <= BLOCKING_MAX_FREQUENCY:
+                candidate_ids.update(candidate.id for candidate in matches)
+        for candidate_id in sorted(candidate_ids):
+            if candidate_id == product.id:
+                continue
+            if source_product_ids is None and candidate_id <= product.id:
+                continue
+            candidate = products_by_id[candidate_id]
+            if candidate.supplier_id != product.supplier_id:
+                shared_tokens = product_tokens[product.id] & product_tokens[candidate.id]
+                left_name = product.raw_name or product.normalized_name
+                right_name = candidate.raw_name or candidate.normalized_name
+                shared_features = any(token.startswith("feature:") for token in shared_tokens)
+                if len(shared_tokens) < 2 and not shared_features and _token_set_ratio(left_name, right_name) < 0.8:
+                    continue
+                yield product, candidate
 
 
 def _token_set_ratio(left: str, right: str) -> float:
@@ -41,8 +131,8 @@ def _price_similarity(left: float, right: float) -> float:
 
 
 def compare_products(product, other) -> tuple[float, list[str]]:
-    left_name = product.normalized_name or product.raw_name
-    right_name = other.normalized_name or other.raw_name
+    left_name = product.raw_name or product.normalized_name
+    right_name = other.raw_name or other.normalized_name
     left_attributes = extract_attributes(left_name)
     right_attributes = extract_attributes(right_name)
     reasons: list[str] = []
@@ -58,7 +148,8 @@ def compare_products(product, other) -> tuple[float, list[str]]:
         label = {"measure": "medida", "type": "tipo", "side": "lado", "compatible_brand": "marca"}.get(attribute, attribute)
         if left_value and right_value and left_value == right_value:
             matched_attributes += 1
-            reasons.append(f"Coincide el atributo {label}: {left_value}.")
+            detail = " (incluye equivalencias en inglés y abreviaturas)" if attribute == "color" else ""
+            reasons.append(f"Coincide el atributo {label}: {left_value}{detail}.")
         elif left_value and right_value and left_value != right_value:
             contradictions += 1
             reasons.append(f"Contradicción en {label}: {left_value} frente a {right_value}.")
@@ -159,6 +250,6 @@ def find_candidates(
         if decision != "discard":
             rounded_score = round(score, 4)
             results.append((candidate, rounded_score, reasons))
-            if db is not None and decision == "review":
+            if db is not None:
                 _persist_pending_match(db, product, candidate, rounded_score, reasons)
     return sorted(results, key=lambda item: item[1], reverse=True)

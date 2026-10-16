@@ -10,8 +10,50 @@ ABBREVIATIONS = {
     "tras": "trasero",
     "roj": "rojo",
     "roja": "rojo",
+    "negra": "negro",
     "neg": "negro",
+    "ng": "negro",
+    "ngr": "negro",
+    "black": "negro",
+    "blk": "negro",
+    "blanca": "blanco",
     "blan": "blanco",
+    "red": "rojo",
+    "blue": "azul",
+    "azule": "azul",
+    "white": "blanco",
+    "green": "verde",
+    "grise": "gris",
+    "gray": "gris",
+    "grey": "gris",
+    "sport": "deportivo",
+    "sports": "deportivo",
+    "oil": "aceite",
+    "engine": "motor",
+    "amarilla": "amarillo",
+    "yellow": "amarillo",
+    "orange": "naranja",
+    "pink": "rosado",
+    "rosa": "rosado",
+    "purple": "morado",
+    "violet": "morado",
+    "morada": "morado",
+    "brown": "marron",
+    "cafe": "marron",
+    "marrón": "marron",
+    "handlebar": "manubrio",
+    "motorcycle": "moto",
+    "puno": "grip",
+    "mango": "grip",
+    "front": "delantero",
+    "rear": "trasero",
+    "left": "izquierdo",
+    "right": "derecho",
+    "brake": "freno",
+    "filter": "filtro",
+    "pads": "pastilla",
+    "pad": "pastilla",
+    "mirror": "espejo",
     "x": "por",
     "par": "par",
     "grip": "grip",
@@ -66,9 +108,22 @@ def extract_attributes(name: str) -> dict:
     normalized = normalize_name(name)
     attributes = {}
 
-    colors = {"rojo": "rojo", "negro": "negro", "azul": "azul", "blanco": "blanco", "gris": "gris"}
+    colors = {
+        "rojo": "rojo",
+        "negro": "negro",
+        "azul": "azul",
+        "blanco": "blanco",
+        "gris": "gris",
+        "verde": "verde",
+        "amarillo": "amarillo",
+        "naranja": "naranja",
+        "rosado": "rosado",
+        "morado": "morado",
+        "marron": "marron",
+    }
+    tokens = set(normalized.split())
     for color, value in colors.items():
-        if color in normalized:
+        if color in tokens:
             attributes["color"] = value
             break
 
@@ -81,11 +136,11 @@ def extract_attributes(name: str) -> dict:
     if "trasero" in normalized or "tras" in normalized:
         attributes["side"] = "trasero"
 
-    if "grip" in normalized or "manubrio" in normalized:
+    if "grip" in tokens:
         attributes["type"] = "grip"
-    if "freno" in normalized:
+    if "freno" in tokens:
         attributes["type"] = "freno"
-    if "filtro" in normalized:
+    if "filtro" in tokens:
         attributes["type"] = "filtro"
 
     if "kawasaki" in normalized or "yamaha" in normalized or "honda" in normalized:

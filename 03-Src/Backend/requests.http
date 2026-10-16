@@ -88,6 +88,11 @@ GET {{host}}/matches/pending?page=1&per_page=20
 
 ### Coincidencias: confirmar
 POST {{host}}/matches/{{matchId}}/confirm
+Content-Type: application/json
+
+{
+  "candidate_product_id": 2
+}
 
 ### Coincidencias: rechazar
 POST {{host}}/matches/{{matchId}}/reject

@@ -13,26 +13,44 @@ function showNotice(id, message) {
 }
 
 async function loadDashboard() {
-  const [catalog, products, pending, inventory] = await Promise.allSettled([
+  const [catalog, products, inventory] = await Promise.allSettled([
     api.get('/canonical-products?per_page=1'),
     api.get('/products?per_page=100'),
-    api.get('/matches/pending?per_page=4'),
     api.get('/reports/inventory'),
   ]);
   const canonicalCount = catalog.status === 'fulfilled' ? catalog.value.meta.total : 0;
   const productItems = products.status === 'fulfilled' ? products.value.data : [];
-  const pendingItems = pending.status === 'fulfilled' ? pending.value.data : [];
   const lowStock = inventory.status === 'fulfilled' ? inventory.value.data.low_stock || [] : [];
   document.getElementById('metricCanonical').textContent = canonicalCount;
   document.getElementById('metricUnlinked').textContent = Math.max(productItems.length - canonicalCount, 0);
-  document.getElementById('metricPending').textContent = pending.status === 'fulfilled' ? pending.value.meta.total : '—';
   document.getElementById('metricCritical').textContent = lowStock.length;
+  await refreshDashboardMatches();
+}
+
+async function refreshDashboardMatches() {
   const list = document.getElementById('dashboardMatches');
-  list.innerHTML = pendingItems.length ? pendingItems.map((item) => `
-    <a class="match-row" href="Pages/coincidencias.html">
-      <div><div class="match-names"><b>${escapeHtml(item.product.raw_name)}</b><span>↔</span><b>${escapeHtml(item.candidate.raw_name)}</b></div><div class="match-reason">${escapeHtml(item.reasons?.[0] || 'Coincidencia pendiente de revisión.')}</div></div>
-      <div><span class="score">${Math.round(item.score * 100)}%</span><span class="status ${item.decision === 'automatic' ? 'status-auto' : 'status-review'}">${item.decision === 'automatic' ? 'Automática' : 'Revisar'}</span></div>
-    </a>`).join('') : empty('Sin coincidencias pendientes', 'Importa una lista para activar el análisis.');
+  const button = document.getElementById('dashboardAnalyze');
+  button.disabled = true;
+  button.textContent = 'Analizando…';
+  showNotice('dashboardNotice', '');
+  list.innerHTML = '<div class="loading-line"></div>';
+  try {
+    await api.post('/matches/suggest', {});
+    const response = await api.get('/matches/pending?per_page=4');
+    const pendingItems = response.data;
+    document.getElementById('metricPending').textContent = response.meta.total;
+    list.innerHTML = pendingItems.length ? pendingItems.map((item) => `
+      <a class="match-row" href="Pages/coincidencias.html">
+        <div><div class="match-names"><b>${escapeHtml(item.product.raw_name)}</b><span>↔</span><b>${escapeHtml(item.candidate.raw_name)}</b></div><div class="match-reason">${escapeHtml(item.reasons?.[0] || 'Coincidencia pendiente de revisión.')}</div></div>
+        <div><span class="score">${Math.round(item.score * 100)}%</span><span class="status ${item.score > 0.9 ? 'status-auto' : 'status-review'}">${item.score > 0.9 ? 'Alta confianza · confirmar' : 'Revisar'}</span></div>
+      </a>`).join('') : empty('Sin coincidencias pendientes', 'Importa una lista para activar el análisis.');
+  } catch (error) {
+    list.innerHTML = empty('No se pudieron analizar coincidencias', error.message);
+    showNotice('dashboardNotice', error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Analizar productos';
+  }
 }
 
 async function loadInventory() {
@@ -139,9 +157,60 @@ async function loadImports() {
 
 async function loadMatches() {
   const list = document.getElementById('matchesList');
-  try { const response = await api.get('/matches/pending?per_page=100'); const items = response.data; list.innerHTML = items.length ? items.map((item) => `<article class="review-card" data-match="${item.id}"><span class="status ${item.decision === 'automatic' ? 'status-auto' : 'status-review'}">${Math.round(item.score * 100)}% · ${item.decision === 'automatic' ? 'automática' : 'revisión'}</span><h3>${escapeHtml(item.product.raw_name)} <span class="muted">↔</span> ${escapeHtml(item.candidate.raw_name)}</h3><p>${escapeHtml((item.reasons || []).join(' '))}</p><div class="review-actions"><button class="button button-primary match-confirm" data-id="${item.id}">Confirmar vínculo</button><button class="button button-danger match-reject" data-id="${item.id}">Rechazar</button></div></article>`).join('') : empty('No hay revisiones pendientes', 'El motor no tiene coincidencias esperando decisión.'); } catch (error) { list.innerHTML = empty('No se pudieron cargar coincidencias', error.message); }
+  try {
+    const response = await api.get('/matches/pending?per_page=100');
+    const items = response.data;
+    list.innerHTML = items.length ? items.map((item) => `
+      <article class="review-card" data-match="${item.id}">
+        <span class="status ${item.decision === 'automatic' ? 'status-auto' : 'status-review'}">${Math.round(item.score * 100)}% · ${item.decision === 'automatic' ? 'automática' : 'revisión'}</span>
+        <h3>${escapeHtml(item.product.raw_name)} <span class="muted">↔</span> ${escapeHtml(item.candidate.raw_name)}</h3>
+        <p>${escapeHtml((item.reasons || []).join(' '))}</p>
+        <div class="review-actions">
+          <button class="button button-primary match-confirm" data-id="${item.id}" data-candidate-id="${item.candidate.id}">Unificar productos</button>
+          <button class="button button-danger match-reject" data-id="${item.id}">Rechazar</button>
+        </div>
+      </article>`).join('') : empty('No hay revisiones pendientes', 'El motor no tiene coincidencias esperando decisión.');
+  } catch (error) {
+    list.innerHTML = empty('No se pudieron cargar coincidencias', error.message);
+  }
 }
-function initMatches() { document.getElementById('refreshMatches').addEventListener('click', async () => { try { await api.post('/matches/suggest', {}); await loadMatches(); } catch (error) { showNotice('matchesNotice', error.message); } }); document.getElementById('matchesList').addEventListener('click', async (event) => { const button = event.target.closest('button[data-id]'); if (!button) return; try { if (button.classList.contains('match-confirm')) await api.post(`/matches/${button.dataset.id}/confirm`, {}); else await api.post(`/matches/${button.dataset.id}/reject`, { create_exclusion_rule: false }); await loadMatches(); } catch (error) { showNotice('matchesNotice', error.message); } }); loadMatches(); }
+function initMatches() {
+  document.getElementById('refreshMatches').addEventListener('click', async () => {
+    const button = document.getElementById('refreshMatches');
+    button.disabled = true;
+    try {
+      await api.post('/matches/suggest', {});
+      await loadMatches();
+    } catch (error) {
+      showNotice('matchesNotice', error.message);
+    } finally {
+      button.disabled = false;
+    }
+  });
+  document.getElementById('matchesList').addEventListener('click', async (event) => {
+    const button = event.target.closest('button[data-id]');
+    if (!button) return;
+    const card = button.closest('.review-card');
+    if (button.classList.contains('match-confirm') && !window.confirm(
+      `¿Unificar únicamente estos dos productos?\n\n${card.querySelector('h3').textContent.replace('↔', 'con')}\n\nEsta acción actualizará el catálogo consolidado.`
+    )) return;
+    button.disabled = true;
+    try {
+      if (button.classList.contains('match-confirm')) {
+        await api.post(`/matches/${button.dataset.id}/confirm`, {
+          candidate_product_id: Number(button.dataset.candidateId),
+        });
+      } else {
+        await api.post(`/matches/${button.dataset.id}/reject`, { create_exclusion_rule: false });
+      }
+      await loadMatches();
+    } catch (error) {
+      button.disabled = false;
+      showNotice('matchesNotice', error.message);
+    }
+  });
+  loadMatches();
+}
 
 function addChatMessage(role, text) { const log = document.getElementById('chatLog'); const item = document.createElement('div'); item.className = `chat-message ${role}`; item.textContent = text; log.appendChild(item); log.scrollTop = log.scrollHeight; }
 async function loadAgentActions() { const list = document.getElementById('agentActions'); try { const response = await api.get('/agent/actions?per_page=8'); list.innerHTML = response.data.length ? response.data.map((item) => `<div class="activity-item"><b>${escapeHtml(item.tool_name)}</b><small>${dateText(item.timestamp)} · ${item.required_confirmation ? (item.approved === null ? 'pendiente' : 'resuelta') : 'ejecutada'}</small></div>`).join('') : empty('Sin acciones', 'El agente todavía no ha ejecutado herramientas.'); } catch (error) { list.innerHTML = empty('Auditoría no disponible', error.message); } }
@@ -218,7 +287,10 @@ function initAgent() {
 
 async function initReports() { const [inventory, purchases] = await Promise.allSettled([api.get('/reports/inventory'), api.get('/reports/purchase-suggestions')]); const report = inventory.status === 'fulfilled' ? inventory.value.data : { total_canonical: 0, low_stock: [] }; const suggestions = purchases.status === 'fulfilled' ? purchases.value.data : []; document.getElementById('reportTotal').textContent = report.total_canonical ?? 0; document.getElementById('reportLow').textContent = report.low_stock?.length ?? 0; document.getElementById('reportSuggestions').textContent = suggestions.length; document.getElementById('lowStockList').innerHTML = report.low_stock?.length ? report.low_stock.map((item) => `<li class="critical"><b>${escapeHtml(item.name)}</b><br><span class="muted">${item.stock_in_bodega} unidades · mínimo ${item.minimum_stock}</span></li>`).join('') : `<li>${empty('Sin alertas de stock', 'No hay productos bajo su mínimo.')}</li>`; document.getElementById('purchaseList').innerHTML = suggestions.length ? suggestions.map((item) => `<li><b>${escapeHtml(item.name)}</b><br><span class="muted">Comprar ${item.units_to_buy} unidades · ${escapeHtml(item.category)}</span></li>`).join('') : `<li>${empty('Sin sugerencias', 'No hay compras pendientes con los filtros actuales.')}</li>`; }
 
-if (page === 'dashboard') loadDashboard();
+if (page === 'dashboard') {
+  document.getElementById('dashboardAnalyze').addEventListener('click', refreshDashboardMatches);
+  loadDashboard();
+}
 if (page === 'inventory') initInventory();
 if (page === 'import') initImport();
 if (page === 'matches') initMatches();
