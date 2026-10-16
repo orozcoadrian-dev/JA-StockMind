@@ -69,14 +69,14 @@ def _bulk_upsert_products(db: Session, rows: list[dict]) -> tuple[int, int]:
     new_rows = [row for row in rows if row["row_hash"] not in existing_by_hash]
     dialect = db.get_bind().dialect.name
     if dialect == "mysql":
-        statement = mysql_insert(Product).prefix_with("IGNORE")
+        statement = mysql_insert(Product.__table__).prefix_with("IGNORE")
     elif dialect == "sqlite":
-        statement = sqlite_insert(Product).on_conflict_do_nothing(
+        statement = sqlite_insert(Product.__table__).on_conflict_do_nothing(
             index_elements=["supplier_id", "row_hash"]
         )
     else:
-        statement = insert(Product)
-    result = db.execute(statement, new_rows) if new_rows else None
+        statement = insert(Product.__table__)
+    result = db.connection().execute(statement, new_rows) if new_rows else None
     if updates:
         db.execute(update(Product), updates, execution_options={"synchronize_session": False})
     inserted_count = max(result.rowcount or 0, 0) if result is not None else 0

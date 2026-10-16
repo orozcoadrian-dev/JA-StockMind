@@ -7,11 +7,12 @@ from unittest.mock import Mock, patch
 
 from openpyxl import Workbook
 from sqlalchemy import func, select
+from sqlalchemy.engine.result import IteratorResult, SimpleResultMetaData
 
 from app.models import Import, Product, Supplier
 from Backend.Services.api_v1 import APIServiceError, create_import
 from Backend.Services.excel_reader import read_excel_file
-from Backend.Services.importer import import_excel_file
+from Backend.Services.importer import _bulk_upsert_products, import_excel_file
 from Backend.Services.normalizer import extract_attributes, normalize_name, parse_price
 
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures"
@@ -36,6 +37,33 @@ class ExcelImportPipelineTest(unittest.TestCase):
         self.assertEqual(parse_price("$ 12.500"), 12500)
         self.assertEqual(parse_price("12.500,00"), 12500)
         self.assertEqual(extract_attributes("Grip rojo 22mm para moto")["color"], "rojo")
+
+    def test_bulk_insert_uses_core_cursor_rowcount(self):
+        db = Mock()
+        db.scalars.return_value.all.return_value = []
+        db.get_bind.return_value.dialect.name = "mysql"
+        db.execute.return_value = IteratorResult(SimpleResultMetaData([]), iter([]))
+        db.connection.return_value.execute.return_value.rowcount = 1
+        row = {
+            "supplier_id": 1,
+            "row_hash": "test-hash",
+            "supplier_code": "A-1",
+            "raw_name": "Grip rojo",
+            "normalized_name": "grip rojo",
+            "category_id": None,
+            "unit_price": 12500,
+            "currency": "COP",
+            "unit": "unidad",
+            "pack_quantity": 1,
+            "price_list_date": None,
+            "import_id": 1,
+        }
+
+        inserted, updated = _bulk_upsert_products(db, [row])
+
+        self.assertEqual((inserted, updated), (1, 0))
+        db.connection.return_value.execute.assert_called_once()
+        db.execute.assert_not_called()
 
     def test_import_without_price_column_returns_actionable_validation_error(self):
         workbook = Workbook()
