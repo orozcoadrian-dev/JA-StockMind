@@ -1,7 +1,7 @@
 # MotoStock — Prompts de construcción del agente
 
 Proyecto: agente de IA para consolidar inventario de repuestos de moto a partir de
-listas de precios en Excel de varios proveedores.
+listas de precios Excel o CSV de varios proveedores.
 
 ---
 
@@ -9,7 +9,7 @@ listas de precios en Excel de varios proveedores.
 
 Un almacén de repuestos de moto en Cartagena compra a cuatro o cinco proveedores
 mayoristas (Inversiones Guerrero, Malusa, Distrimotos, Partes del Caribe). Cada uno
-manda su lista de precios en Excel, cada mes, con su propio formato: columnas
+manda su lista de precios en Excel o CSV, cada mes, con su propio formato: columnas
 distintas, códigos internos distintos y nombres escritos a mano por quien digitó.
 
 El mismo repuesto aparece como `GRIP ROJO DEPORTIVO`, `Manubrio grip rojo`,
@@ -20,11 +20,13 @@ cuántos grips rojos hay en bodega ni a quién conviene comprarlos.
 El dueño sí sabe las equivalencias — las tiene en la cabeza. Lo que no tiene es
 tiempo de cruzarlas archivo por archivo.
 
-**Lo que hace el agente:** recibe los Excel, normaliza los productos, propone
-equivalencias entre proveedores, aprende las reglas que el dueño le dicta en
-lenguaje natural ("si un grip rojo lo provee Guerrero y Malusa, es el mismo"), y a
-partir de eso sugiere decisiones: consolidar stock duplicado, a qué proveedor
-comprar cada referencia, qué está sobrestockeado y qué está por agotarse.
+**Lo que hace el agente:** consulta el catálogo que se alimenta al importar Excel o
+CSV, normaliza los productos, propone equivalencias entre proveedores y conserva
+las reglas que el dueño le dicta en lenguaje natural ("si un grip rojo lo provee
+Guerrero y Malusa, es el mismo"). Las reglas persistidas orientan comparaciones
+futuras; los archivos no reentrenan el modelo Gemini. A partir del catálogo sugiere
+decisiones: consolidar stock duplicado, a qué proveedor comprar, qué está
+sobrestoqueado y qué está por agotarse.
 
 Esto es un entorno agéntico real y no un chatbot: el agente tiene herramientas
 (leer archivo, consultar catálogo, crear regla, calcular equivalencia, generar
@@ -37,17 +39,17 @@ reporte), decide cuáles usar, y sus decisiones cambian el estado del sistema.
 Ejecuta un prompt por conversación o por sesión de trabajo. No los mezcles: cada
 uno asume que el anterior ya quedó funcionando.
 
-| # | Prompt | Qué deja listo | Cómo verificas antes de seguir |
-|---|--------|----------------|-------------------------------|
-| 0 | Contexto maestro | `agent.md` en la raíz | El archivo existe y describe el dominio |
-| 1 | Esqueleto Flask | Servidor que levanta | `python app.py` → responde `/api/health` |
-| 2 | Esquemas JSON | Modelos y contratos de datos | Los JSON de ejemplo validan |
-| 3 | Ingesta de Excel | Subir y normalizar archivos | Subes un `.xlsx` y ves productos normalizados |
-| 4 | Motor de equivalencias | Agrupación de productos | Detecta el caso del grip rojo |
-| 5 | Agente IA | Herramientas y loop | Le dictas una regla y la aplica |
-| 6 | API REST | Endpoints completos | Todos responden desde Postman o curl |
-| 7 | Frontend | Interfaz Kawasaki | Flujo completo desde el navegador |
-| 8 | Pruebas y documentación | Entregable del parcial | README + datos de prueba + tests |
+| #   | Prompt                  | Qué deja listo               | Cómo verificas antes de seguir                |
+| --- | ----------------------- | ---------------------------- | --------------------------------------------- |
+| 0   | Contexto maestro        | `agent.md` en la raíz        | El archivo existe y describe el dominio       |
+| 1   | Esqueleto Flask         | Servidor que levanta         | `python app.py` → responde `/api/health`      |
+| 2   | Esquemas JSON           | Modelos y contratos de datos | Los JSON de ejemplo validan                   |
+| 3   | Ingesta de Excel        | Subir y normalizar archivos  | Subes un `.xlsx` y ves productos normalizados |
+| 4   | Motor de equivalencias  | Agrupación de productos      | Detecta el caso del grip rojo                 |
+| 5   | Agente IA               | Herramientas y loop          | Le dictas una regla y la aplica               |
+| 6   | API REST                | Endpoints completos          | Todos responden desde Postman o curl          |
+| 7   | Frontend                | Interfaz Kawasaki            | Flujo completo desde el navegador             |
+| 8   | Pruebas y documentación | Entregable del parcial       | README + datos de prueba + tests              |
 
 **Por qué este orden.** El frontend va casi al final a propósito: si lo construyes
 primero terminas rehaciendo pantallas cada vez que cambia el contrato de la API. Y
@@ -81,7 +83,7 @@ Son el mismo producto. El sistema debe poder saberlo.
 
 QUÉ CONSTRUIMOS
 Un agente de IA que:
-1. Recibe archivos Excel de proveedores y normaliza sus productos a un catálogo único.
+1. Recibe archivos Excel o CSV de proveedores y normaliza sus productos a un catálogo único.
 2. Propone equivalencias entre productos de proveedores distintos, con un puntaje
    de confianza y la razón de la propuesta.
 3. Aprende reglas que el usuario le dicta en lenguaje natural y las convierte en
@@ -351,18 +353,18 @@ otra medida. Escribe esa prueba explícitamente.
 Lee agent.md. El motor de equivalencias ya funciona como función de Python.
 Ahora envolvemos todo en un agente que decide por su cuenta qué ejecutar.
 
-backend/agent/
+03-Src/Backend/Agent/
 
 tools.py — las herramientas ejecutables, cada una con su esquema JSON de
 parámetros para tool calling:
-- import_excel(file_id, supplier_id)
 - search_products(query, supplier_id?, category?)
 - get_canonical_product(id)
-- suggest_matches(product_id?)
+- suggest_matches(import_id?) — compara el lote recién importado con otros proveedores
+- list_pending_matches() — consulta propuestas pendientes con razones
 - create_equivalence_rule(natural_text) → interpreta el texto y devuelve la regla
   estructurada para que el usuario la confirme antes de guardarla
 - list_rules()
-- consolidate(product_ids, canonical_name) → DESTRUCTIVA, exige confirmación
+- consolidate(suggestion_id, candidate_product_id) → DESTRUCTIVA, exige confirmación
 - get_inventory_report(filters)
 - compare_supplier_prices(canonical_product_id)
 - get_purchase_suggestions(budget?, categories?)
@@ -394,8 +396,9 @@ Endpoints:
 - GET  /api/agent/actions — bitácora
 
 FLUJOS QUE DEBEN FUNCIONAR DE PUNTA A PUNTA
-1. "Acabo de subir la lista de Malusa, dime qué productos se repiten con Guerrero"
-   → busca, sugiere coincidencias, presenta con razones, no fusiona sin permiso.
+1. Tras importar una lista de Malusa, el sistema compara el lote contra otros
+  proveedores. "¿Qué productos se repiten con Guerrero?" → consulta las
+  coincidencias pendientes y presenta razones, no fusiona sin permiso.
 2. "Si un grip rojo lo provee Inversiones Guerrero y Malusa, es el mismo"
    → interpreta, muestra la regla estructurada, pide confirmación, la guarda, la
    aplica retroactivamente y reporta cuántos productos afectó.

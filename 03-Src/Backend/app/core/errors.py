@@ -16,6 +16,7 @@ HTTP_MESSAGES = {
     413: "El archivo supera el tamaño máximo permitido.",
     422: "La solicitud no cumple el formato requerido.",
     429: "Se excedió el límite de solicitudes. Inténtalo más tarde.",
+    502: "El proveedor de IA rechazó la solicitud.",
     500: "Ocurrió un error interno.",
     503: "El servicio no está disponible temporalmente.",
 }

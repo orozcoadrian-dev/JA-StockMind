@@ -11,6 +11,12 @@ class ConversationMemory:
         self._messages.append({"role": role, "content": content, **extra})
         self._compact()
 
+    def snapshot(self) -> tuple[list[dict], str]:
+        return ([dict(message) for message in self._messages], self._summary)
+
+    def restore(self, snapshot: tuple[list[dict], str]) -> None:
+        self._messages, self._summary = snapshot
+
     def _compact(self) -> None:
         if len(self._messages) <= self.max_messages:
             return

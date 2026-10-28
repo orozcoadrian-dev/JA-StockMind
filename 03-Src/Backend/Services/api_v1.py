@@ -35,6 +35,7 @@ from Backend.Services.matcher import (
     iter_candidate_pairs,
 )
 from Backend.Services.normalizer import extract_attributes
+from Backend.Services.rules_engine import apply_rules
 
 
 class APIServiceError(Exception):
@@ -177,13 +178,15 @@ def delete_supplier(db: Session, supplier_id: int) -> None:
 def create_import(db: Session, supplier_id: int, filename: str, contents: bytes) -> dict[str, Any]:
     if db.get(Supplier, supplier_id) is None:
         raise _not_found("El proveedor")
-    if Path(filename).suffix.lower() != ".xlsx":
-        raise APIServiceError(422, "La extensión del archivo no es válida. Usa .xlsx.")
-    try:
-        workbook = load_workbook(BytesIO(contents), read_only=True, data_only=True)
-        workbook.close()
-    except Exception as exc:
-        raise APIServiceError(422, "El archivo no es un libro Excel .xlsx válido.") from exc
+    extension = Path(filename).suffix.lower()
+    if extension not in {".xlsx", ".csv"}:
+        raise APIServiceError(422, "La extensión del archivo no es válida. Usa .xlsx o .csv.")
+    if extension == ".xlsx":
+        try:
+            workbook = load_workbook(BytesIO(contents), read_only=True, data_only=True)
+            workbook.close()
+        except Exception as exc:
+            raise APIServiceError(422, "El archivo no es un libro Excel .xlsx válido.") from exc
 
     stored_path = _save_uploaded_file(BytesIO(contents), filename)
     try:
@@ -310,18 +313,22 @@ def canonical_suppliers(db: Session, canonical_id: int) -> list[dict[str, Any]]:
     return _canonical_data(db, item)["suppliers"]
 
 
-def suggest_matches(db: Session) -> list[dict[str, Any]]:
-    latest_import = db.scalar(
-        select(Import)
-        .where(Import.status == ImportStatus.COMPLETED, Import.rows_imported > 0)
-        .order_by(Import.created_at.desc(), Import.id.desc())
-        .limit(1)
+def suggest_matches(db: Session, import_id: int | None = None) -> list[dict[str, Any]]:
+    source_import = (
+        db.get(Import, import_id)
+        if import_id is not None
+        else db.scalar(
+            select(Import)
+            .where(Import.status == ImportStatus.COMPLETED, Import.rows_imported > 0)
+            .order_by(Import.created_at.desc(), Import.id.desc())
+            .limit(1)
+        )
     )
-    if latest_import is None:
+    if source_import is None or source_import.status != ImportStatus.COMPLETED or source_import.rows_imported <= 0:
         return []
 
     source_products = db.scalars(
-        select(Product).where(Product.import_id == latest_import.id).order_by(Product.id)
+        select(Product).where(Product.import_id == source_import.id).order_by(Product.id)
     ).all()
     if not source_products:
         return []
@@ -336,14 +343,23 @@ def suggest_matches(db: Session) -> list[dict[str, Any]]:
     source_product_ids = {product.id for product in source_products}
     suggestions = []
     for product, candidate in iter_candidate_pairs(products, source_product_ids):
-        score, reasons = compare_products(product, candidate)
-        if score < REVIEW_THRESHOLD:
+        rule_result = apply_rules(product, db, other_product=candidate)
+        if rule_result["decision"] == "exclude":
             continue
+        if rule_result["decision"] == "merge" and not rule_result["conflicts"]:
+            score = 1.0
+            reasons = ["Equivalencia indicada por una regla activa del usuario."]
+        else:
+            score, reasons = compare_products(product, candidate)
+            if score < REVIEW_THRESHOLD:
+                continue
         rounded_score = round(score, 4)
         _persist_pending_match(db, product, candidate, rounded_score, reasons)
         suggestions.append({
             "product_id": product.id,
             "candidate_product_id": candidate.id,
+            "product": _product_data(db, product),
+            "candidate": _product_data(db, candidate),
             "score": rounded_score,
             "reasons": reasons,
             "status": "pending",
@@ -558,8 +574,13 @@ def inventory_report(db: Session, category: str | None) -> dict[str, Any]:
     if category:
         query = query.join(Category, Category.id == CanonicalProduct.category_id).where(Category.name == category)
     products = db.scalars(query).all()
-    low_stock = [product for product in products if product.stock <= product.min_stock]
-    return {"total_canonical": len(products), "low_stock": [_canonical_data(db, product) for product in low_stock]}
+    low_stock = [product for product in products if product.min_stock > 0 and product.stock <= product.min_stock]
+    without_minimum = [product for product in products if product.min_stock <= 0]
+    return {
+        "total_canonical": len(products),
+        "low_stock": [_canonical_data(db, product) for product in low_stock],
+        "without_minimum_count": len(without_minimum),
+    }
 
 
 def price_comparison(db: Session, canonical_id: int) -> list[dict[str, Any]]:
@@ -580,6 +601,8 @@ def purchase_suggestions(db: Session, budget: Decimal | None, categories: list[s
     products = db.scalars(query).all()
     suggestions = []
     for product in products:
+        if product.min_stock <= 0:
+            continue
         units_to_buy = max(product.min_stock - product.stock, 0)
         if not units_to_buy:
             continue

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query, Request
+import httpx
 from sqlalchemy.orm import Session
 
 from ..core.rate_limit import limiter
@@ -11,10 +12,28 @@ from Backend.Services import api_v1 as service
 router = APIRouter(prefix="/agent", tags=["Agente"])
 
 
-@router.post("/chat", response_model=APIEnvelope[dict], responses=responses(422, 429, 500, 503))
+@router.post("/chat", response_model=APIEnvelope[dict], responses=responses(422, 429, 500, 502, 503))
 @limiter.limit("30/minute")
 def agent_chat(request: Request, payload: AgentChatRequest):
-    return {"data": agent_core.run(payload.message, payload.session_id), "meta": {}}
+    try:
+        result = agent_core.run(payload.message, payload.session_id)
+    except httpx.HTTPStatusError as exc:
+        from Backend.Services.api_v1 import APIServiceError
+
+        raise APIServiceError(
+            502,
+            f"Gemini rechazó la solicitud (HTTP {exc.response.status_code}).",
+            {"provider_status": exc.response.status_code},
+        ) from exc
+    except httpx.RequestError as exc:
+        from Backend.Services.api_v1 import APIServiceError
+
+        raise APIServiceError(503, "No se pudo conectar con Gemini.") from exc
+    except RuntimeError as exc:
+        from Backend.Services.api_v1 import APIServiceError
+
+        raise APIServiceError(503, str(exc)) from exc
+    return {"data": result, "meta": {}}
 
 
 @router.post("/confirm", response_model=APIEnvelope[dict], responses=responses(404, 409, 422, 500))

@@ -75,7 +75,13 @@ def row_hash(row: dict) -> str:
 
 def read_excel_file(file_path: str | Path) -> dict:
     path = Path(file_path)
-    frame = pd.read_excel(path, header=None, dtype=str)
+    if path.suffix.lower() == ".csv":
+        try:
+            frame = pd.read_csv(path, header=None, dtype=str, sep=None, engine="python", encoding="utf-8-sig")
+        except UnicodeDecodeError:
+            frame = pd.read_csv(path, header=None, dtype=str, sep=None, engine="python", encoding="latin-1")
+    else:
+        frame = pd.read_excel(path, header=None, dtype=str)
 
     if frame.empty:
         raise ValueError("El archivo Excel está vacío.")

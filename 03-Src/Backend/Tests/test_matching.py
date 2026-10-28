@@ -9,9 +9,10 @@ from uuid import uuid4
 
 from sqlalchemy import select
 
-from Backend.Services.api_v1 import APIServiceError, confirm_match, list_pending_matches, suggest_matches
+from Backend.Services.api_v1 import APIServiceError, confirm_match, inventory_report, list_pending_matches, suggest_matches
 from app.models import (
     EquivalenceRule as MySQLEquivalenceRule,
+    ImportStatus,
     LinkStatus,
     Origin,
     Product as MySQLProduct,
@@ -49,6 +50,21 @@ def product(product_id, supplier_id, name, price, category="manillar"):
 
 
 class MatchingEngineTest(unittest.TestCase):
+    def test_zero_stock_minimum_does_not_create_false_low_stock_alert(self):
+        products = [
+            SimpleNamespace(id=1, stock=0, min_stock=0),
+            SimpleNamespace(id=2, stock=2, min_stock=5),
+            SimpleNamespace(id=3, stock=8, min_stock=5),
+        ]
+        db = SimpleNamespace(scalars=lambda statement: SimpleNamespace(all=lambda: products))
+
+        with patch("Backend.Services.api_v1._canonical_data", side_effect=lambda session, item: {"id": item.id}):
+            report = inventory_report(db, None)
+
+        self.assertEqual(report["total_canonical"], 3)
+        self.assertEqual(report["low_stock"], [{"id": 2}])
+        self.assertEqual(report["without_minimum_count"], 1)
+
     def test_confirm_match_unifies_only_the_selected_pair(self):
         products = {
             1: SimpleNamespace(id=1, raw_name="GRIP NEGRO", category_id=1),
@@ -250,13 +266,15 @@ class MatchingEngineTest(unittest.TestCase):
         candidate = product(20, 2, "GRIP BLACK 22mm", 190000)
         query_results = iter(([source], [candidate]))
         db = SimpleNamespace(
-            scalar=lambda statement: SimpleNamespace(id=7),
+            scalar=lambda statement: SimpleNamespace(id=7, status=ImportStatus.COMPLETED, rows_imported=1),
             scalars=lambda statement: SimpleNamespace(all=lambda: next(query_results)),
             commit=lambda: None,
         )
         with (
             patch("Backend.Services.api_v1.iter_candidate_pairs", return_value=[(source, candidate)]) as pairs,
+            patch("Backend.Services.api_v1.apply_rules", return_value={"decision": "none", "conflicts": []}),
             patch("Backend.Services.api_v1.compare_products", return_value=(0.95, ["Mismo color"])) ,
+            patch("Backend.Services.api_v1._product_data", side_effect=lambda db, item: {"id": item.id, "raw_name": item.raw_name}),
             patch("Backend.Services.api_v1._persist_pending_match") as persist,
         ):
             suggestions = suggest_matches(db)

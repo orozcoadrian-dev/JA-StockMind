@@ -5,6 +5,84 @@ const dateText = (value) => value ? new Date(value).toLocaleDateString('es-CO', 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 const empty = (title, detail = 'Cuando haya datos, aparecerán aquí.') => `<div class="empty-state"><strong>${escapeHtml(title)}</strong>${escapeHtml(detail)}</div>`;
 
+function appendInlineMarkdown(container, text) {
+  const pattern = /(\*\*.+?\*\*|`[^`]+`|\*[^*]+\*)/g;
+  let cursor = 0;
+  for (const match of text.matchAll(pattern)) {
+    container.append(document.createTextNode(text.slice(cursor, match.index)));
+    const token = match[0];
+    const element = token.startsWith('**') ? document.createElement('strong')
+      : token.startsWith('`') ? document.createElement('code')
+        : document.createElement('em');
+    element.textContent = token.startsWith('**') ? token.slice(2, -2) : token.slice(1, -1);
+    container.append(element);
+    cursor = match.index + token.length;
+  }
+  container.append(document.createTextNode(text.slice(cursor)));
+}
+
+function renderAssistantMarkdown(container, markdown) {
+  container.replaceChildren();
+  let orderedList = null;
+  let orderedItem = null;
+  let nestedList = null;
+  let rootList = null;
+  for (const rawLine of String(markdown ?? '').split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    if (/^[-*_]{3,}$/.test(line)) {
+      orderedList = orderedItem = nestedList = rootList = null;
+      container.append(document.createElement('hr'));
+      continue;
+    }
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      orderedList = orderedItem = nestedList = rootList = null;
+      const element = document.createElement(`h${heading[1].length + 1}`);
+      appendInlineMarkdown(element, heading[2]);
+      container.append(element);
+      continue;
+    }
+    const ordered = line.match(/^\d+[.)]\s+(.+)$/);
+    const unordered = line.match(/^[-*]\s+(.+)$/);
+    if (ordered) {
+      if (!orderedList) {
+        orderedList = document.createElement('ol');
+        container.append(orderedList);
+      }
+      const item = document.createElement('li');
+      appendInlineMarkdown(item, ordered[1]);
+      orderedList.append(item);
+      orderedItem = item;
+      nestedList = null;
+      rootList = null;
+      continue;
+    }
+    if (unordered) {
+      const parent = orderedItem || container;
+      if (parent === container) {
+        if (!rootList) {
+          rootList = document.createElement('ul');
+          container.append(rootList);
+        }
+        nestedList = rootList;
+      } else if (!nestedList || nestedList.parentElement !== orderedItem) {
+        nestedList = document.createElement('ul');
+        orderedItem.append(nestedList);
+      }
+      const item = document.createElement('li');
+      appendInlineMarkdown(item, unordered[1]);
+      nestedList.append(item);
+      continue;
+    }
+    orderedList = orderedItem = nestedList = rootList = null;
+    const quote = line.match(/^>\s?(.*)$/);
+    const paragraph = document.createElement(quote ? 'blockquote' : 'p');
+    appendInlineMarkdown(paragraph, quote ? quote[1] : line);
+    container.append(paragraph);
+  }
+}
+
 function showNotice(id, message) {
   const element = document.getElementById(id);
   if (!element) return;
@@ -135,8 +213,20 @@ function initImport() {
       const result = await request('/imports', { method: 'POST', body: data });
       const summary = result.data.summary || {};
       progress.style.width = '100%';
-      status.textContent = 'Importación completada';
-      showNotice('importResult', `Importación completada: ${summary.imported_rows ?? 0} filas importadas, ${(summary.rejected_rows || []).length} rechazadas.`);
+      const importSummary = `Importación completada: ${summary.imported_rows ?? 0} filas importadas, ${(summary.rejected_rows || []).length} rechazadas.`;
+      status.textContent = 'Importación completada; el agente analiza coincidencias…';
+      showNotice('importResult', importSummary);
+      try {
+        const analysis = await api.post('/agent/chat', {
+          message: `Acabo de importar el lote ${result.data.id}. Compara sus productos contra los demás proveedores con la herramienta suggest_matches usando import_id ${result.data.id}. Resume las coincidencias con mayor puntaje y sus razones. No fusiones productos.`,
+          session_id: 'frontend-demo',
+        });
+        status.textContent = 'Importación y análisis completados';
+        showNotice('importResult', `${importSummary}\n\nAnálisis del agente: ${analysis.data.response}`);
+      } catch (analysisError) {
+        status.textContent = 'Importación completada; análisis pendiente';
+        showNotice('importResult', `${importSummary}\n\nEl catálogo quedó guardado, pero el agente no pudo analizarlo: ${analysisError.message}`);
+      }
       await loadImports();
     } catch (error) {
       status.textContent = 'No se pudo completar la importación';
@@ -212,7 +302,7 @@ function initMatches() {
   loadMatches();
 }
 
-function addChatMessage(role, text) { const log = document.getElementById('chatLog'); const item = document.createElement('div'); item.className = `chat-message ${role}`; item.textContent = text; log.appendChild(item); log.scrollTop = log.scrollHeight; }
+function addChatMessage(role, text) { const log = document.getElementById('chatLog'); const item = document.createElement('div'); item.className = `chat-message ${role}`; if (role === 'assistant') renderAssistantMarkdown(item, text); else item.textContent = text; log.appendChild(item); log.scrollTop = log.scrollHeight; }
 async function loadAgentActions() { const list = document.getElementById('agentActions'); try { const response = await api.get('/agent/actions?per_page=8'); list.innerHTML = response.data.length ? response.data.map((item) => `<div class="activity-item"><b>${escapeHtml(item.tool_name)}</b><small>${dateText(item.timestamp)} · ${item.required_confirmation ? (item.approved === null ? 'pendiente' : 'resuelta') : 'ejecutada'}</small></div>`).join('') : empty('Sin acciones', 'El agente todavía no ha ejecutado herramientas.'); } catch (error) { list.innerHTML = empty('Auditoría no disponible', error.message); } }
 async function consumeAgentStream(stream, message) {
   const reader = stream.getReader();
@@ -220,11 +310,11 @@ async function consumeAgentStream(stream, message) {
   let buffer = '';
   let eventName = 'message';
   let responseText = '';
-  const render = () => { message.textContent = responseText; message.parentElement.scrollTop = message.parentElement.scrollHeight; };
+  const render = () => { renderAssistantMarkdown(message, responseText); message.parentElement.scrollTop = message.parentElement.scrollHeight; };
   const handleEvent = (data) => {
     if (!data || data === '[DONE]') return;
     let payload = data;
-    try { payload = JSON.parse(data); } catch {}
+    try { payload = JSON.parse(data); } catch { }
     const type = payload?.type || eventName;
     if (type === 'tool' || type === 'tool_call') {
       const name = payload.name || payload.tool_name || 'herramienta';
@@ -285,7 +375,24 @@ function initAgent() {
   loadAgentActions();
 }
 
-async function initReports() { const [inventory, purchases] = await Promise.allSettled([api.get('/reports/inventory'), api.get('/reports/purchase-suggestions')]); const report = inventory.status === 'fulfilled' ? inventory.value.data : { total_canonical: 0, low_stock: [] }; const suggestions = purchases.status === 'fulfilled' ? purchases.value.data : []; document.getElementById('reportTotal').textContent = report.total_canonical ?? 0; document.getElementById('reportLow').textContent = report.low_stock?.length ?? 0; document.getElementById('reportSuggestions').textContent = suggestions.length; document.getElementById('lowStockList').innerHTML = report.low_stock?.length ? report.low_stock.map((item) => `<li class="critical"><b>${escapeHtml(item.name)}</b><br><span class="muted">${item.stock_in_bodega} unidades · mínimo ${item.minimum_stock}</span></li>`).join('') : `<li>${empty('Sin alertas de stock', 'No hay productos bajo su mínimo.')}</li>`; document.getElementById('purchaseList').innerHTML = suggestions.length ? suggestions.map((item) => `<li><b>${escapeHtml(item.name)}</b><br><span class="muted">Comprar ${item.units_to_buy} unidades · ${escapeHtml(item.category)}</span></li>`).join('') : `<li>${empty('Sin sugerencias', 'No hay compras pendientes con los filtros actuales.')}</li>`; }
+async function initReports() {
+  const [inventory, purchases] = await Promise.allSettled([
+    api.get('/reports/inventory'),
+    api.get('/reports/purchase-suggestions'),
+  ]);
+  const report = inventory.status === 'fulfilled' ? inventory.value.data : { total_canonical: 0, low_stock: [], without_minimum_count: 0 };
+  const suggestions = purchases.status === 'fulfilled' ? purchases.value.data : [];
+  const withoutMinimum = report.without_minimum_count || 0;
+  document.getElementById('reportTotal').textContent = report.total_canonical ?? 0;
+  document.getElementById('reportLow').textContent = report.low_stock?.length ?? 0;
+  document.getElementById('reportSuggestions').textContent = suggestions.length;
+  document.getElementById('lowStockList').innerHTML = report.low_stock?.length
+    ? report.low_stock.map((item) => `<li class="critical"><b>${escapeHtml(item.name)}</b><br><span class="muted">${item.stock_in_bodega} unidades · mínimo ${item.minimum_stock}</span></li>`).join('')
+    : `<li>${empty(withoutMinimum ? 'Faltan mínimos de stock' : 'Sin alertas de stock', withoutMinimum ? `${withoutMinimum} artículos no tienen mínimo configurado; no se pueden clasificar como agotándose.` : 'Todos los mínimos configurados tienen existencias suficientes.')}</li>`;
+  document.getElementById('purchaseList').innerHTML = suggestions.length
+    ? suggestions.map((item) => `<li><b>${escapeHtml(item.name)}</b><br><span class="muted">Comprar ${item.units_to_buy} unidades · ${escapeHtml(item.category)}${item.estimated_cost != null ? ` · ${money(item.estimated_cost)}` : ' · falta precio confirmado'}</span></li>`).join('')
+    : `<li>${empty('Sin sugerencias calculables', withoutMinimum ? `Configura mínimos de stock para ${withoutMinimum} artículos y confirma equivalencias/precios para preparar la próxima compra.` : 'No hay artículos bajo su mínimo con los filtros actuales.')}</li>`;
+}
 
 if (page === 'dashboard') {
   document.getElementById('dashboardAnalyze').addEventListener('click', refreshDashboardMatches);

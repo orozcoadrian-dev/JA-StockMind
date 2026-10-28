@@ -32,6 +32,20 @@ class ExcelImportPipelineTest(unittest.TestCase):
         self.assertIn("rows", result)
         self.assertIn("warnings", result)
 
+    def test_csv_reader_detects_semicolon_delimited_headers(self):
+        with TemporaryDirectory() as directory:
+            csv_path = Path(directory) / "proveedor.csv"
+            csv_path.write_text(
+                "SKU;Descripción;Precio\nG-1;Grip rojo 22mm;12500\n",
+                encoding="utf-8",
+            )
+
+            result = read_excel_file(csv_path)
+
+        self.assertEqual(result["row_count"], 1)
+        self.assertEqual(result["rows"][0]["data"]["provider_code"], "G-1")
+        self.assertEqual(result["rows"][0]["data"]["raw_name"], "Grip rojo 22mm")
+
     def test_normalizer_handles_colombian_currency_and_names(self):
         self.assertEqual(normalize_name("GRIPS ROJ. UNIV."), "grip rojo universal")
         self.assertEqual(parse_price("$ 12.500"), 12500)
@@ -90,6 +104,24 @@ class ExcelImportPipelineTest(unittest.TestCase):
         self.assertIn("unit_price", raised.exception.details["reason"])
         self.assertIn("Precio, valor o costo", raised.exception.details["required_columns"])
         self.assertFalse(stored_path.exists())
+
+    def test_csv_import_is_stored_for_agent_analysis(self):
+        db = Mock()
+        db.get.side_effect = [object(), Mock(id=17)]
+        contents = b"SKU;Descripcion;Precio\nG-1;Grip rojo 22mm;12500\n"
+
+        with (
+            patch("Backend.Services.api_v1._save_uploaded_file", return_value="supplier.csv"),
+            patch("Backend.Services.api_v1.import_excel_file", return_value={"import_id": 17}),
+            patch("Backend.Services.api_v1._import_data", return_value={"id": 17, "summary": {"imported_rows": 1}}),
+            patch("Backend.Services.api_v1.suggest_matches") as matcher,
+            patch("Backend.Services.api_v1.load_workbook") as load_workbook_mock,
+        ):
+            result = create_import(db, 1, "supplier.csv", contents)
+
+        load_workbook_mock.assert_not_called()
+        matcher.assert_not_called()
+        self.assertEqual(result["id"], 17)
 
     @unittest.skipUnless(
         RUN_MYSQL_INTEGRATION,

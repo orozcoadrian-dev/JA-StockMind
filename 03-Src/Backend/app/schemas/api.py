@@ -210,6 +210,7 @@ ERROR_RESPONSES = {
         413: "Archivo demasiado grande",
         422: "Error de validación",
         429: "Límite de solicitudes excedido",
+        502: "Error en el proveedor de IA",
         500: "Error interno",
         503: "Servicio no disponible",
     }.items()
