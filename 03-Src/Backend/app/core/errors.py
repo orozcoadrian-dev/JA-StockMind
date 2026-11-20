@@ -28,7 +28,15 @@ def error_payload(code: str, message: str, details: dict[str, Any] | None = None
 
 
 def register_exception_handlers(app) -> None:
+    from Backend.Agent.persistent_memory import SessionNotFoundError
     from Backend.Services.api_v1 import APIServiceError
+
+    @app.exception_handler(SessionNotFoundError)
+    async def chat_session_not_found_handler(request: Request, exc: SessionNotFoundError):
+        return JSONResponse(
+            status_code=404,
+            content=error_payload("CHAT_SESSION_NOT_FOUND", str(exc)),
+        )
 
     @app.exception_handler(APIServiceError)
     async def service_error_handler(request: Request, exc: APIServiceError):

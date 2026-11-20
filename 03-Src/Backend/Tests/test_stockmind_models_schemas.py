@@ -5,9 +5,17 @@ from decimal import Decimal
 from pydantic import ValidationError
 
 from app.db.base import Base
-from app.models import Import, Product, ProductLink
-from app.models.enums import ImportStatus, LinkStatus, Origin, RuleType
-from app.schemas import EquivalenceRuleCreate, ProductCreate, ProductLinkCreate
+from app.models import AgentAction, ChatMessage, ChatSession, Import, Product, ProductLink
+from app.models.enums import ChatMessageRole, ChatSessionStatus, ImportStatus, LinkStatus, Origin, RuleType
+from app.schemas import (
+    ChatMessageOut,
+    ChatSessionCreate,
+    ChatSessionOut,
+    ChatSessionUpdate,
+    EquivalenceRuleCreate,
+    ProductCreate,
+    ProductLinkCreate,
+)
 
 
 class StockMindSchemaTest(unittest.TestCase):
@@ -23,8 +31,26 @@ class StockMindSchemaTest(unittest.TestCase):
                 "product_links",
                 "equivalence_rules",
                 "agent_actions",
+                "chat_sessions",
+                "chat_messages",
             },
         )
+        self.assertEqual(ChatSession.__table__.c.id.type.unsigned, True)
+        self.assertEqual(ChatMessage.__table__.c.content.type.__class__.__name__, "LONGTEXT")
+        self.assertEqual(ChatSession.__table__.c.status.type.enums, ["active", "archived"])
+        self.assertEqual(ChatMessage.__table__.c.role.type.enums, ["user", "assistant", "tool", "system"])
+        self.assertEqual([item.value for item in ChatSessionStatus], ["active", "archived"])
+        self.assertEqual([item.value for item in ChatMessageRole], ["user", "assistant", "tool", "system"])
+        self.assertEqual(
+            next(iter(ChatMessage.__table__.c.session_id.foreign_keys)).ondelete,
+            "RESTRICT",
+        )
+        self.assertEqual(
+            next(iter(AgentAction.__table__.c.chat_session_id.foreign_keys)).ondelete,
+            "RESTRICT",
+        )
+        self.assertIn("idx_chat_messages_session", {index.name for index in ChatMessage.__table__.indexes})
+        self.assertIn("idx_chat_messages_session_created", {index.name for index in ChatMessage.__table__.indexes})
         self.assertEqual(Product.__table__.c.unit_price.type.precision, 12)
         self.assertEqual(Product.__table__.c.unit_price.type.scale, 2)
         self.assertEqual(ProductLink.__table__.c.confidence.type.precision, 4)
@@ -105,6 +131,15 @@ class StockMindSchemaTest(unittest.TestCase):
                 condition_json={"type": "equivalence", "match": {"x": 1}, "suppliers": ["A", "B"]},
             )
         self.assertIn("rule_type debe coincidir con condition_json.type.", str(context.exception))
+
+    def test_chat_schemas_validate_creation_update_and_model_output(self):
+        create = ChatSessionCreate(title="Conversación de inventario")
+        update = ChatSessionUpdate(status=ChatSessionStatus.ARCHIVED)
+
+        self.assertEqual(create.title, "Conversación de inventario")
+        self.assertEqual(update.status, ChatSessionStatus.ARCHIVED)
+        self.assertTrue(ChatSessionOut.model_fields)
+        self.assertTrue(ChatMessageOut.model_fields)
 
 
 @unittest.skipUnless(

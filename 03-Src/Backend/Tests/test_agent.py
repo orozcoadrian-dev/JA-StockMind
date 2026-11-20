@@ -1,9 +1,26 @@
 import unittest
 from unittest.mock import Mock, patch
 
+from sqlalchemy import create_engine, text
+from sqlalchemy.dialects import mysql
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.orm import sessionmaker
+
 from Backend.Agent.core import AgentCore, GeminiClient
 from Backend.Agent.memory import ConversationMemory
 from Backend.Agent.tools import TOOL_SCHEMAS, execute_tool
+from app.db.base import Base
+from app.models import AgentAction, ChatMessage, ChatSession
+
+
+@compiles(mysql.TINYINT, "sqlite")
+def compile_mysql_tinyint_for_sqlite(type_, compiler, **kwargs):
+    return "INTEGER"
+
+
+@compiles(mysql.LONGTEXT, "sqlite")
+def compile_mysql_longtext_for_sqlite(type_, compiler, **kwargs):
+    return "TEXT"
 
 
 class FakeLLM:
@@ -93,6 +110,33 @@ class AgentWorkflowTest(unittest.TestCase):
     def setUp(self):
         self.db = Mock()
         self.db.scalars.return_value.all.return_value = []
+        self.engine = create_engine("sqlite:///:memory:")
+        updated_at_default = ChatSession.__table__.c.updated_at.server_default
+        ChatSession.__table__.c.updated_at.server_default = text("CURRENT_TIMESTAMP")
+        try:
+            Base.metadata.create_all(
+                self.engine,
+                tables=[ChatSession.__table__, AgentAction.__table__, ChatMessage.__table__],
+            )
+        finally:
+            ChatSession.__table__.c.updated_at.server_default = updated_at_default
+        self.agent_session_factory = sessionmaker(
+            bind=self.engine,
+            autoflush=False,
+            expire_on_commit=False,
+        )
+        self.addCleanup(self.engine.dispose)
+        prompt_patch = patch("Backend.Agent.core.build_system_prompt", return_value="system prompt")
+        prompt_patch.start()
+        self.addCleanup(prompt_patch.stop)
+
+    def create_session(self, external_id):
+        db = self.agent_session_factory()
+        session = ChatSession(external_id=external_id, message_count=0)
+        db.add(session)
+        db.commit()
+        db.close()
+        return external_id
 
     def test_gemini_client_uses_free_model_by_default(self):
         with patch.dict("os.environ", {"GEMINI_API_KEY": "test-key"}, clear=True):
@@ -105,6 +149,26 @@ class AgentWorkflowTest(unittest.TestCase):
             "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
         )
 
+    def test_gemini_client_sends_api_key_as_bearer_token(self):
+        response = Mock()
+        response.json.return_value = {"choices": [{"message": {"content": "Respuesta"}}]}
+        with (
+            patch.dict("os.environ", {"GEMINI_API_KEY": "test-key"}, clear=True),
+            patch("Backend.Agent.core.httpx.post", return_value=response) as post,
+        ):
+            GeminiClient().complete([], {})
+
+        self.assertEqual(post.call_args.kwargs["headers"]["Authorization"], "Bearer test-key")
+
+    def test_agent_caps_configured_loop_at_eight_iterations(self):
+        core = AgentCore(
+            llm_client=DirectReplyLLM(),
+            db_factory=self.agent_session_factory,
+            max_iterations=12,
+        )
+
+        self.assertEqual(core.max_iterations, 8)
+
     def test_tool_schemas_and_loop_chain_tool_calls(self):
         self.assertIn("search_products", TOOL_SCHEMAS)
         self.assertIn("consolidate", TOOL_SCHEMAS)
@@ -113,8 +177,8 @@ class AgentWorkflowTest(unittest.TestCase):
             "Backend.Agent.tools.list_products",
             return_value=([{"id": 1, "raw_name": "Grip rojo"}], {"total": 1}),
         ) as search:
-            core = AgentCore(llm_client=FakeLLM(), db_factory=lambda: self.db)
-            result = core.run("Busca los grips rojos", session_id="test-agent")
+            core = AgentCore(llm_client=FakeLLM(), db_factory=self.agent_session_factory)
+            result = core.run("Busca los grips rojos", session_id=self.create_session("test-agent"))
 
         search.assert_called_once()
         self.assertIn("search_products", TOOL_SCHEMAS)
@@ -126,8 +190,8 @@ class AgentWorkflowTest(unittest.TestCase):
     def test_gemini_thought_signature_is_preserved_across_tool_turns(self):
         llm = SignatureLLM()
         with patch("Backend.Agent.tools.list_products", return_value=([], {"total": 0})):
-            core = AgentCore(llm_client=llm, db_factory=lambda: self.db)
-            result = core.run("Busca grip rojo", session_id="signature-session")
+            core = AgentCore(llm_client=llm, db_factory=self.agent_session_factory)
+            result = core.run("Busca grip rojo", session_id=self.create_session("signature-session"))
 
         self.assertEqual(result["response"], "Comparación completada.")
         assistant_message = next(message for message in llm.second_turn if message.get("role") == "assistant")
@@ -139,8 +203,8 @@ class AgentWorkflowTest(unittest.TestCase):
     def test_multiple_tool_calls_are_returned_in_one_assistant_message(self):
         llm = ParallelToolsLLM()
         with patch("Backend.Agent.tools.list_products", return_value=([], {"total": 0})):
-            core = AgentCore(llm_client=llm, db_factory=lambda: self.db)
-            result = core.run("Prepara reporte de productos y compras", session_id="multi-tool-session")
+            core = AgentCore(llm_client=llm, db_factory=self.agent_session_factory)
+            result = core.run("Prepara reporte de productos y compras", session_id=self.create_session("multi-tool-session"))
 
         assistant_messages = [message for message in llm.final_messages if message.get("role") == "assistant"]
         self.assertEqual(result["response"], "Reporte preparado.")
@@ -152,28 +216,29 @@ class AgentWorkflowTest(unittest.TestCase):
             ["signature-1", "signature-2"],
         )
     def test_chat_answers_without_imported_csv_or_tool_calls(self):
-        core = AgentCore(llm_client=DirectReplyLLM(), db_factory=lambda: self.db)
+        core = AgentCore(llm_client=DirectReplyLLM(), db_factory=self.agent_session_factory)
 
-        result = core.run("Hola, ¿qué puedes hacer?", session_id="empty-catalog")
+        result = core.run("Hola, ¿qué puedes hacer?", session_id=self.create_session("empty-catalog"))
 
         self.assertIn("Puedo ayudarte", result["response"])
         self.assertEqual(result["tools_used"], [])
         self.assertEqual(result["pending_confirmations"], [])
 
-    def test_failed_provider_request_does_not_poison_session_memory(self):
+    def test_provider_failure_is_returned_and_persisted_for_the_next_request(self):
         llm = FailsOnceLLM()
-        core = AgentCore(llm_client=llm, db_factory=lambda: self.db)
+        core = AgentCore(llm_client=llm, db_factory=self.agent_session_factory)
 
-        with self.assertRaises(RuntimeError):
-            core.run("Primer intento", session_id="retry-session")
+        first_result = core.run("Primer intento", session_id=self.create_session("retry-session"))
 
-        result = core.run("Segundo intento", session_id="retry-session")
+        result = core.run("Segundo intento", session_id=first_result["session_id"])
 
+        self.assertIn("no está disponible", first_result["content"])
         self.assertEqual(result["response"], "El agente volvió a responder.")
         self.assertEqual(
             [message["content"] for message in llm.retry_messages if message["role"] == "user"],
-            ["Segundo intento"],
+            ["Primer intento", "Segundo intento"],
         )
+        self.assertTrue(any(message["role"] == "assistant" for message in llm.retry_messages))
 
     def test_consolidation_requires_confirmation(self):
         result = execute_tool("consolidate", {"suggestion_id": 4, "candidate_product_id": 9})

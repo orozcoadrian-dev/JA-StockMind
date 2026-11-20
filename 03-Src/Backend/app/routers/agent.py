@@ -12,7 +12,7 @@ from Backend.Services import api_v1 as service
 router = APIRouter(prefix="/agent", tags=["Agente"])
 
 
-@router.post("/chat", response_model=APIEnvelope[dict], responses=responses(422, 429, 500, 502, 503))
+@router.post("/chat", response_model=APIEnvelope[dict], responses=responses(404, 422, 429, 500, 502, 503))
 @limiter.limit("30/minute")
 def agent_chat(request: Request, payload: AgentChatRequest):
     try:

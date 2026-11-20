@@ -23,3 +23,15 @@ class RuleType(str, Enum):
     EQUIVALENCE = "equivalence"
     EXCLUSION = "exclusion"
     PURCHASE_PREFERENCE = "purchase_preference"
+
+
+class ChatSessionStatus(str, Enum):
+    ACTIVE = "active"
+    ARCHIVED = "archived"
+
+
+class ChatMessageRole(str, Enum):
+    USER = "user"
+    ASSISTANT = "assistant"
+    TOOL = "tool"
+    SYSTEM = "system"

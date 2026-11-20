@@ -1,6 +1,7 @@
 from app.schemas.agent_action import AgentActionCreate, AgentActionRead, AgentActionUpdate
 from app.schemas.canonical_product import CanonicalProductCreate, CanonicalProductRead, CanonicalProductUpdate
 from app.schemas.category import CategoryCreate, CategoryRead, CategoryUpdate
+from app.schemas.chat import ChatMessageOut, ChatSessionCreate, ChatSessionOut, ChatSessionUpdate
 from app.schemas.common import PaginatedResponse, PaginationMeta
 from app.schemas.equivalence_rule import EquivalenceRuleCreate, EquivalenceRuleRead, EquivalenceRuleUpdate
 from app.schemas.import_record import ImportCreate, ImportRead, ImportUpdate
@@ -12,6 +13,7 @@ __all__ = [
     "AgentActionCreate", "AgentActionRead", "AgentActionUpdate",
     "CanonicalProductCreate", "CanonicalProductRead", "CanonicalProductUpdate",
     "CategoryCreate", "CategoryRead", "CategoryUpdate",
+    "ChatMessageOut", "ChatSessionCreate", "ChatSessionOut", "ChatSessionUpdate",
     "EquivalenceRuleCreate", "EquivalenceRuleRead", "EquivalenceRuleUpdate",
     "ImportCreate", "ImportRead", "ImportUpdate",
     "PaginatedResponse", "PaginationMeta",

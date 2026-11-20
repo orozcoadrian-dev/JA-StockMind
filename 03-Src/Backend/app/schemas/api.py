@@ -130,7 +130,7 @@ class MatchConfirmRequest(BaseModel):
 
 class AgentChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=10000)
-    session_id: str = Field(default="default", min_length=1, max_length=64)
+    session_id: str | None = Field(default=None, min_length=1, max_length=36)
 
 
 class AgentConfirmRequest(BaseModel):
