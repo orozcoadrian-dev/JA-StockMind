@@ -1,7 +1,0 @@
-cd "C:\Users\Usuario\Documents\Programming-Projects\JA-StockMind\03-Src"
-
-.\.venv\Scripts\Activate.ps1
-$env:PYTHONPATH = ".\Backend"
-python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-
-python -m http.server 5501 --directory Frontend

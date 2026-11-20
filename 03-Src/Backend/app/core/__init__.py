@@ -1,1 +1,0 @@
-"""Application configuration and infrastructure."""
