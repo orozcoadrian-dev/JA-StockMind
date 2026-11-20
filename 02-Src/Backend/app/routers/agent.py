@@ -16,7 +16,8 @@ router = APIRouter(prefix="/agent", tags=["Agente"])
 @limiter.limit("30/minute")
 def agent_chat(request: Request, payload: AgentChatRequest):
     try:
-        result = agent_core.run(payload.message, payload.session_id)
+        session_id = str(payload.session_id) if payload.session_id is not None else None
+        result = agent_core.run(payload.message, session_id)
     except httpx.HTTPStatusError as exc:
         from Backend.Services.api_v1 import APIServiceError
 

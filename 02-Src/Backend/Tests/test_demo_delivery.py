@@ -1,5 +1,6 @@
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 from Backend.Agent.tools import execute_tool
 from Backend.Services.excel_reader import read_excel_file
@@ -32,7 +33,17 @@ class DemoDeliveryTest(unittest.TestCase):
         self.assertTrue(any("28mm" in name for name in all_names))
 
     def test_natural_rule_is_structured_before_confirmation(self):
-        result = execute_tool("create_equivalence_rule", {"natural_text": "si un grip rojo lo provee Inversiones Guerrero y Malusa, es el mismo"})
+        with patch("Backend.Agent.tools.SessionLocal") as session_factory:
+            session = Mock()
+            session.scalars.side_effect = [
+                Mock(all=Mock(return_value=["Inversiones Guerrero", "Malusa"])),
+                Mock(all=Mock(return_value=[])),
+            ]
+            session_factory.return_value = session
+            result = execute_tool(
+                "create_equivalence_rule",
+                {"natural_text": "si un grip rojo lo provee Inversiones Guerrero y Malusa, es el mismo"},
+            )
 
         condition = result["data"]["structured_condition"]
         self.assertTrue(result["confirmation_required"])

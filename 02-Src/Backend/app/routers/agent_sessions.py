@@ -1,8 +1,8 @@
 from datetime import datetime
 from typing import Any, Literal
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, status
+from pydantic import UUID4
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -31,7 +31,7 @@ SESSION_RESPONSE_EXAMPLE = {
 ERROR_DOCS = responses(404, 422, 429, 500)
 
 
-def _session_or_404(db: Session, session_id: UUID):
+def _session_or_404(db: Session, session_id: UUID4):
     session = PersistentMemory(db).get_session(str(session_id))
     if session is None:
         raise SessionNotFoundError(str(session_id))
@@ -104,7 +104,7 @@ def list_agent_sessions(
         },
     },
 )
-def get_agent_session(session_id: UUID, db: Session = Depends(get_db)):
+def get_agent_session(session_id: UUID4, db: Session = Depends(get_db)):
     return {"data": _session_or_404(db, session_id), "meta": {}}
 
 
@@ -144,7 +144,7 @@ def get_agent_session(session_id: UUID, db: Session = Depends(get_db)):
     },
 )
 def list_agent_session_messages(
-    session_id: UUID,
+    session_id: UUID4,
     limit: int = Query(default=50, ge=1, le=500, examples=[50]),
     before_seq: int | None = Query(default=None, ge=1, examples=[31]),
     include_tools: bool = Query(default=False, examples=[False, True]),
@@ -179,7 +179,7 @@ def list_agent_session_messages(
 @limiter.limit("30/minute")
 def update_agent_session(
     request: Request,
-    session_id: UUID,
+    session_id: UUID4,
     payload: ChatSessionUpdate,
     db: Session = Depends(get_db),
 ):
@@ -261,7 +261,7 @@ def update_agent_session(
         },
     },
 )
-def export_agent_session(session_id: UUID, db: Session = Depends(get_db)):
+def export_agent_session(session_id: UUID4, db: Session = Depends(get_db)):
     session = _session_or_404(db, session_id)
     messages = db.scalars(
         select(ChatMessage)

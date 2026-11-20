@@ -30,7 +30,7 @@ flowchart LR
 
 ### Persistencia
 
-SQLAlchemy y SQLite almacenan el producto original (`Product`), el catálogo real (`CanonicalProduct`), vínculos (`ProductLink`), sugerencias (`MatchSuggestion`), reglas (`EquivalenceRule`), importaciones (`ImportRecord`) y bitácora del agente (`AgentAction`). Cada importación conserva la ruta del archivo y su resumen.
+SQLAlchemy almacena el producto original (`Product`), el catálogo real (`CanonicalProduct`), vínculos (`ProductLink`), sugerencias (`MatchSuggestion`), reglas (`EquivalenceRule`), importaciones (`ImportRecord`) y bitácora del agente (`AgentAction`). El historial conversacional se conserva en `ChatSession` y `ChatMessage`; las preferencias confirmadas viven en `AgentMemoryFact` con referencias a la sesión y al mensaje de origen.
 
 ### Servicios
 
@@ -43,7 +43,7 @@ SQLAlchemy y SQLite almacenan el producto original (`Product`), el catálogo rea
 
 ### API
 
-`Backend/Api/rest.py` expone la superficie canónica `/api/v1`. Los listados son paginados y usan filtros por query string. Los errores se transforman en JSON uniforme. Las importaciones y el chat tienen un rate limit sencillo por IP y ruta.
+La superficie canónica es `/api/v1`; los éxitos usan `data/meta` y los errores un JSON uniforme. Las rutas de sesiones `/agent/sessions` permiten listar, crear, consultar, renombrar, archivar, leer mensajes y exportar. El chat acepta mensajes de hasta 8000 caracteres y session IDs UUID4. `/agent/memory/facts` lista facts con paginación y estado; `PATCH /agent/memory/facts/{id}` solo los deshabilita.
 
 ## Por qué es un entorno agéntico
 
@@ -60,9 +60,15 @@ Las herramientas disponibles son:
 - consolidar productos;
 - generar inventario;
 - comparar precios;
-- sugerir compras.
+- sugerir compras;
+- guardar una preferencia estable con confirmación (`remember_fact`);
+- consultar preferencias activas (`list_memory_facts`).
 
 El agente puede cambiar el estado mediante importaciones, reglas confirmadas y consolidaciones aprobadas. Las acciones destructivas no se ejecutan desde el primer `tool_call`: devuelven `confirmation_required`, se registran en `AgentAction` y esperan `POST /api/v1/agent/confirm`. Si el usuario rechaza, se registra la decisión y no se modifica el catálogo.
+
+Las preferencias confirmadas se añaden al contexto como un bloque `system` de hasta 20 facts. Al superar `AGENT_SUMMARY_THRESHOLD` (60 por defecto) mensajes desde el resumen previo, el agente guarda otro resumen `system`; los mensajes fuente permanecen intactos y no se vuelven a enviar al LLM. `GET /api/v1/agent/memory/facts` lista los facts y `PATCH /api/v1/agent/memory/facts/{id}` los deshabilita sin borrarlos. `AGENT_MEMORY_MAX_MESSAGES` controla el tamaño del contexto reciente (30 por defecto).
+
+Los IDs UUID4 dificultan la enumeración, pero no reemplazan la autenticación. La API aún no asigna propietario a sesiones ni facts y el listado de sesiones es global; no debe exponerse a clientes no confiables hasta añadir autenticación y autorización por propietario. El frontend renderiza contenido mediante `textContent`; el contenido histórico continúa siendo no confiable para las instrucciones del LLM.
 
 ## Decisiones y trazabilidad
 
@@ -73,5 +79,6 @@ Una consolidación siempre deja `ProductLink`. El vínculo conserva producto ori
 ## Fronteras operativas
 
 - El LLM se configura por `LLM_API_KEY`, `LLM_API_URL` y `LLM_MODEL`; sin clave, el agente informa que no está configurado.
+- `AGENT_MEMORY_MAX_MESSAGES` limita el historial reciente enviado al LLM (30); `AGENT_SUMMARY_THRESHOLD` inicia el resumen de la conversación (60).
 - No se inventan datos: los estados vacíos del frontend reflejan tablas vacías.
 - El frontend consume exclusivamente `/api/v1` y no contiene métricas de demostración.

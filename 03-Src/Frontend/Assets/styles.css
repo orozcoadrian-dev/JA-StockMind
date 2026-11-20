@@ -1,0 +1,476 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  color-scheme: light;
+  --verde: #6cb33f;
+  --verde-hondo: #4a8a2a;
+  --negro: #101010;
+  --grafito: #2b2e2c;
+  --hueso: #f3f4f0;
+  --blanco: #fff;
+  --muted: #788078;
+  --line: #dfe3dc;
+  --alerta: #b52e32;
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--hueso);
+  color: var(--grafito);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+summary:focus-visible {
+  outline: 3px solid rgba(108, 179, 63, .65);
+  outline-offset: 3px;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(270px, 320px) minmax(0, 1fr);
+}
+
+.conversation-panel {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: 0;
+  padding: 26px 18px 18px;
+  background: var(--negro);
+  color: var(--hueso);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 0 0 28px;
+  color: var(--hueso);
+  text-decoration: none;
+  font: 700 22px 'Barlow Condensed', sans-serif;
+  letter-spacing: .08em;
+}
+
+.brand-mark {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  background: var(--verde);
+  color: var(--negro);
+  font: 500 15px 'IBM Plex Mono', monospace;
+}
+
+.brand-accent {
+  color: var(--verde);
+}
+
+.conversation-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 0 15px;
+  color: var(--verde);
+  font: 11px 'IBM Plex Mono', monospace;
+  letter-spacing: .12em;
+  list-style: none;
+  cursor: pointer;
+}
+
+.conversation-heading::-webkit-details-marker {
+  display: none;
+}
+
+.conversation-heading::after {
+  content: '⌄';
+  color: var(--hueso);
+  font-size: 16px;
+}
+
+.conversation-panel[open] .conversation-heading::after {
+  content: '⌃';
+}
+
+.conversation-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.new-conversation,
+.send-button {
+  min-height: 43px;
+  border: 0;
+  background: var(--verde);
+  color: var(--negro);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .18s ease, transform .18s ease;
+}
+
+.new-conversation {
+  margin-bottom: 15px;
+}
+
+.new-conversation:hover,
+.send-button:hover {
+  background: #83c45b;
+  transform: translateY(-1px);
+}
+
+.new-conversation:disabled,
+.send-button:disabled,
+.conversation-open:disabled,
+.text-button:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.conversation-state,
+.conversation-empty {
+  margin: 8px 0;
+  color: #aeb6ae;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.conversation-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 3px;
+}
+
+.conversation-item {
+  padding: 10px 9px;
+  border: 1px solid #343934;
+  background: #1b1e1b;
+}
+
+.conversation-item.is-active {
+  border-color: var(--verde);
+  background: #222820;
+}
+
+.conversation-open {
+  display: grid;
+  width: 100%;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--hueso);
+  text-align: left;
+  cursor: pointer;
+}
+
+.conversation-title {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-date {
+  color: #a0a9a0;
+  font-size: 11px;
+}
+
+.conversation-actions {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.text-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #c3cbc0;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.text-button:hover {
+  color: var(--verde);
+}
+
+.archive-button:hover {
+  color: #f0a8a8;
+}
+
+.main-content {
+  display: flex;
+  min-width: 0;
+  min-height: 100vh;
+  flex-direction: column;
+  padding: 32px clamp(18px, 5vw, 72px);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: min(100%, 1120px);
+  margin: 0 auto 24px;
+}
+
+.kicker,
+.section-label {
+  margin: 0;
+  color: var(--verde-hondo);
+  font: 11px 'IBM Plex Mono', monospace;
+  letter-spacing: .13em;
+}
+
+h1,
+h2 {
+  margin: 5px 0 0;
+  color: var(--negro);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
+}
+
+h1 {
+  font-size: clamp(30px, 3.2vw, 44px);
+  line-height: 1;
+}
+
+.status {
+  padding: 8px 10px;
+  background: #e4ecdE;
+  color: #375d26;
+  font: 10px 'IBM Plex Mono', monospace;
+  letter-spacing: .04em;
+  text-align: center;
+}
+
+.api-error {
+  width: min(100%, 1120px);
+  margin: 0 auto 14px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--alerta);
+  background: #f8e8e7;
+  color: #762528;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.chat-panel {
+  display: flex;
+  width: min(100%, 1120px);
+  min-height: min(690px, calc(100vh - 150px));
+  flex: 1;
+  flex-direction: column;
+  margin: 0 auto;
+  padding: clamp(17px, 2.4vw, 27px);
+  background: var(--negro);
+  color: var(--hueso);
+}
+
+.chat-heading {
+  padding-bottom: 20px;
+}
+
+.chat-heading .section-label {
+  color: var(--verde);
+}
+
+.chat-heading h2 {
+  color: var(--blanco);
+  font-size: 28px;
+}
+
+.chat-state {
+  align-self: flex-start;
+  margin: auto 0;
+  padding: 10px 12px;
+  color: #adb6ac;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.chat-state.is-error {
+  color: #ffb6b6;
+}
+
+.chat-log {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  flex: 1;
+  overflow: auto;
+  padding: 5px 3px 20px;
+}
+
+.chat-message {
+  max-width: min(80%, 790px);
+  padding: 12px 15px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.chat-message.user {
+  justify-self: end;
+  background: var(--verde);
+  color: var(--negro);
+}
+
+.chat-message.assistant {
+  justify-self: start;
+  background: #252924;
+  color: #dce4db;
+  border-left: 2px solid var(--verde);
+}
+
+.message-label {
+  display: block;
+  margin-bottom: 4px;
+  color: inherit;
+  font: 10px 'IBM Plex Mono', monospace;
+  opacity: .74;
+}
+
+.message-text {
+  margin: 0;
+  font-size: 14px;
+  white-space: pre-wrap;
+}
+
+.chat-form {
+  display: flex;
+  gap: 9px;
+  padding-top: 12px;
+  border-top: 1px solid #343934;
+}
+
+.chat-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 45px;
+  padding: 10px 12px;
+  border: 1px solid #454a44;
+  border-radius: 0;
+  background: #1b1e1b;
+  color: var(--hueso);
+}
+
+.chat-input::placeholder {
+  color: #a0a9a0;
+}
+
+.send-button {
+  min-width: 105px;
+  padding: 0 15px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    display: block;
+  }
+
+  .conversation-panel {
+    position: relative;
+    z-index: 1;
+    height: auto;
+    min-height: 0;
+    padding: 13px 15px;
+  }
+
+  .brand {
+    margin-bottom: 12px;
+  }
+
+  .conversation-heading {
+    padding: 10px 0 8px;
+  }
+
+  .conversation-panel:not([open]) .conversation-content {
+    display: none;
+  }
+
+  .conversation-list {
+    max-height: 35vh;
+  }
+
+  .main-content {
+    min-height: calc(100vh - 74px);
+    padding: 20px 14px;
+  }
+
+  .topbar {
+    align-items: flex-start;
+    margin-bottom: 17px;
+  }
+
+  .status {
+    max-width: 135px;
+  }
+
+  .chat-panel {
+    min-height: 65vh;
+    padding: 16px;
+  }
+
+  .chat-message {
+    max-width: 92%;
+  }
+}
+
+@media (max-width: 460px) {
+  .topbar {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .status {
+    max-width: none;
+  }
+
+  .chat-form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .send-button {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

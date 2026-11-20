@@ -292,3 +292,46 @@ El agente registra cada acción ejecutada con la intención de auditar decisione
 - El JSON estructurado debe ser serializable y fácil de consultar con SQLAlchemy JSON.
 - Cada regla debe quedar con su texto original y su versión ejecutable.
 - El sistema debe poder distinguir equivalencias, exclusiones y preferencias de compra sin ambigüedad.
+
+---
+
+## 8. ChatSession y ChatMessage
+
+`ChatSession.external_id` es UUID4. `ChatMessage` conserva el historial con secuencia consecutiva; los resúmenes son mensajes `system` con metadatos, y no reemplazan ni eliminan los mensajes originales de la base.
+
+### Enviar chat
+
+`POST /api/v1/agent/chat`
+
+```json
+{
+  "message": "Compara los precios de frenos",
+  "session_id": "d2719b7e-7d7a-48a6-a012-31fae2d4d000"
+}
+```
+
+- `message`: requerido, entre 1 y 8000 caracteres.
+- `session_id`: opcional, solo UUID4; si se omite se crea una sesión.
+- Un mensaje demasiado largo o un ID con formato inválido devuelve 422.
+
+### Sesiones y mensajes
+
+- `GET /api/v1/agent/sessions?status=active&limit=20&offset=0`: lista paginada.
+- `POST /api/v1/agent/sessions`: crea sesión.
+- `GET /api/v1/agent/sessions/{uuid4}`: consulta metadatos.
+- `GET /api/v1/agent/sessions/{uuid4}/messages?limit=50&include_tools=false`: lee historial ordenado por `seq`.
+- `PATCH /api/v1/agent/sessions/{uuid4}`: renombra o archiva/reactiva.
+- `GET /api/v1/agent/sessions/{uuid4}/export`: exporta mensajes y datos de sesión.
+
+Las respuestas exitosas usan `{ "data": ..., "meta": ... }`; los errores usan `{ "error": { "code", "message", "details" } }`.
+
+## 9. AgentMemoryFact
+
+Cada fact persistido contiene `id`, `key`, `value`, `source_session_id`, `source_message_id` nullable, `status` (`active|disabled`), `created_at` y `updated_at`. Guardar facts requiere la confirmación de `remember_fact`; `list_memory_facts` solo devuelve facts activos. Los facts deshabilitados se conservan.
+
+- `GET /api/v1/agent/memory/facts?status=active&limit=20&offset=0`: lista facts; `status` también acepta `disabled` y `all`.
+- `PATCH /api/v1/agent/memory/facts/{id}` con `{"status":"disabled"}`: deshabilita sin borrar.
+- `AGENT_MEMORY_MAX_MESSAGES` (30 por defecto) limita el contexto reciente.
+- `AGENT_SUMMARY_THRESHOLD` (60 por defecto) dispara resúmenes LLM guardados como mensajes `system`; los mensajes fuente permanecen disponibles en el historial.
+
+**Seguridad:** UUID4 reduce la posibilidad de adivinar IDs, pero no sustituye autenticación. Las rutas de sesión, acciones y facts no tienen autorización por usuario y el listado de sesiones es global; no exponerlas a clientes no confiables hasta implementar propiedad y aislamiento.

@@ -35,3 +35,8 @@ class ChatMessageRole(str, Enum):
     ASSISTANT = "assistant"
     TOOL = "tool"
     SYSTEM = "system"
+
+
+class AgentMemoryFactStatus(str, Enum):
+    ACTIVE = "active"
+    DISABLED = "disabled"

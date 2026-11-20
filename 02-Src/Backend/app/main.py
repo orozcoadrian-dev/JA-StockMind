@@ -7,6 +7,7 @@ from .core.logging import configure_logging
 from .core.rate_limit import limiter
 from .core.upload_limit import UploadSizeLimitMiddleware
 from .routers.agent import router as agent_router
+from .routers.agent_memory import router as agent_memory_router
 from .routers.agent_sessions import router as agent_sessions_router
 from .routers.canonical_products import router as canonical_products_router
 from .routers.health import router as health_router
@@ -45,5 +46,6 @@ app.include_router(matches_router, prefix="/api/v1")
 app.include_router(rules_router, prefix="/api/v1")
 app.include_router(agent_router, prefix="/api/v1")
 app.include_router(agent_sessions_router, prefix="/api/v1")
+app.include_router(agent_memory_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
 register_exception_handlers(app)

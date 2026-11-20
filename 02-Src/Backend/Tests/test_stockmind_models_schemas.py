@@ -5,8 +5,16 @@ from decimal import Decimal
 from pydantic import ValidationError
 
 from app.db.base import Base
-from app.models import AgentAction, ChatMessage, ChatSession, Import, Product, ProductLink
-from app.models.enums import ChatMessageRole, ChatSessionStatus, ImportStatus, LinkStatus, Origin, RuleType
+from app.models import AgentAction, AgentMemoryFact, ChatMessage, ChatSession, Import, Product, ProductLink
+from app.models.enums import (
+    AgentMemoryFactStatus,
+    ChatMessageRole,
+    ChatSessionStatus,
+    ImportStatus,
+    LinkStatus,
+    Origin,
+    RuleType,
+)
 from app.schemas import (
     ChatMessageOut,
     ChatSessionCreate,
@@ -33,7 +41,18 @@ class StockMindSchemaTest(unittest.TestCase):
                 "agent_actions",
                 "chat_sessions",
                 "chat_messages",
+                "agent_memory_facts",
             },
+        )
+        self.assertEqual(AgentMemoryFact.__table__.c.status.type.enums, ["active", "disabled"])
+        self.assertEqual([item.value for item in AgentMemoryFactStatus], ["active", "disabled"])
+        self.assertEqual(
+            next(iter(AgentMemoryFact.__table__.c.source_session_id.foreign_keys)).ondelete,
+            "RESTRICT",
+        )
+        self.assertEqual(
+            next(iter(AgentMemoryFact.__table__.c.source_message_id.foreign_keys)).ondelete,
+            "SET NULL",
         )
         self.assertEqual(ChatSession.__table__.c.id.type.unsigned, True)
         self.assertEqual(ChatMessage.__table__.c.content.type.__class__.__name__, "LONGTEXT")

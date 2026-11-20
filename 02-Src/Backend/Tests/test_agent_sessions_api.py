@@ -7,12 +7,13 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from app.core.errors import register_exception_handlers
 from app.core.rate_limit import limiter
 from app.db.base import Base
 from app.db.session import get_db
-from app.models import AgentAction, ChatMessage, ChatSession
+from app.models import AgentAction, AgentMemoryFact, ChatMessage, ChatSession
 from app.routers.agent_sessions import router
 
 
@@ -28,7 +29,11 @@ def compile_mysql_longtext_for_sqlite(type_, compiler, **kwargs):
 
 class AgentSessionsApiTest(unittest.TestCase):
     def setUp(self):
-        self.engine = create_engine("sqlite:///:memory:")
+        self.engine = create_engine(
+            "sqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
         updated_at_default = ChatSession.__table__.c.updated_at.server_default
         ChatSession.__table__.c.updated_at.server_default = text("CURRENT_TIMESTAMP")
         try:
@@ -38,6 +43,7 @@ class AgentSessionsApiTest(unittest.TestCase):
                     ChatSession.__table__,
                     AgentAction.__table__,
                     ChatMessage.__table__,
+                    AgentMemoryFact.__table__,
                 ],
             )
         finally:

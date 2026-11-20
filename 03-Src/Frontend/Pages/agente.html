@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Agente / StockMind</title>
+  <link rel="stylesheet" href="../Assets/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <details class="conversation-panel" id="conversationPanel">
+      <summary class="conversation-heading">CONVERSACIONES</summary>
+      <div class="conversation-content">
+        <button class="new-conversation" id="newConversation" type="button">＋ Nueva conversación</button>
+        <p class="conversation-state" id="conversationState" role="status">Cargando conversaciones…</p>
+        <div class="conversation-list" id="conversationList" aria-label="Historial de conversaciones"></div>
+      </div>
+    </details>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <p class="kicker">AGENTE / CONSULTA OPERATIVA</p>
+          <h1>StockMind</h1>
+        </div>
+        <span class="status">HISTORIAL PERSISTENTE</span>
+      </header>
+
+      <div class="api-error" id="apiError" role="alert" hidden></div>
+
+      <section class="chat-panel" aria-label="Conversación con el agente">
+        <header class="chat-heading">
+          <p class="section-label">STOCKMIND / AGENTE</p>
+          <h2>¿Qué necesitas revisar?</h2>
+        </header>
+        <p class="chat-state" id="chatState" role="status">Elige una conversación o inicia una nueva.</p>
+        <div class="chat-log" id="chatLog" aria-live="polite" aria-relevant="additions"></div>
+        <form class="chat-form" id="chatForm">
+          <input
+            class="chat-input"
+            id="chatInput"
+            name="message"
+            type="text"
+            maxlength="8000"
+            placeholder="Ej. compara los precios de frenos"
+            autocomplete="off"
+            aria-label="Mensaje para el agente"
+            required
+          >
+          <button class="send-button" id="sendButton" type="submit">Enviar →</button>
+        </form>
+      </section>
+    </main>
+  </div>
+  <script src="../Assets/Js/api.js"></script>
+  <script src="../Assets/Js/script.js"></script>
+</body>
+</html>

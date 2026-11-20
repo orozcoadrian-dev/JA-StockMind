@@ -4,11 +4,12 @@ import re
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, Field, ValidationError, model_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from sqlalchemy import select
 
 from app.db.session import SessionLocal
 from app.models import Category, Supplier
+from Backend.Agent.persistent_memory import PersistentMemory
 from Backend.Services.api_v1 import (
     APIServiceError,
     confirm_match,
@@ -68,6 +69,19 @@ class PurchaseParams(BaseModel):
     categories: list[str] | None = None
 
 
+class RememberFactParams(BaseModel):
+    key: str = Field(min_length=1, max_length=120)
+    value: str = Field(min_length=1, max_length=4000)
+
+    @field_validator("key", "value")
+    @classmethod
+    def require_nonempty_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("El texto no puede estar vacío.")
+        return normalized
+
+
 TOOL_SCHEMAS = {
     "search_products": {"name": "search_products", "description": "Busca productos importados.", "parameters": SearchProductsParams.model_json_schema()},
     "get_canonical_product": {"name": "get_canonical_product", "description": "Consulta un producto canónico y sus proveedores.", "parameters": IdParams.model_json_schema()},
@@ -79,6 +93,8 @@ TOOL_SCHEMAS = {
     "get_inventory_report": {"name": "get_inventory_report", "description": "Genera un reporte de inventario real.", "parameters": InventoryParams.model_json_schema()},
     "compare_supplier_prices": {"name": "compare_supplier_prices", "description": "Compara productos por nombre consultando el catálogo, o precios de proveedores para un producto canónico confirmado.", "parameters": CompareSupplierPricesParams.model_json_schema()},
     "get_purchase_suggestions": {"name": "get_purchase_suggestions", "description": "Sugiere compras con base en stock y precios.", "parameters": PurchaseParams.model_json_schema()},
+    "remember_fact": {"name": "remember_fact", "description": "Guarda una preferencia estable del usuario; siempre requiere confirmación explícita.", "parameters": RememberFactParams.model_json_schema()},
+    "list_memory_facts": {"name": "list_memory_facts", "description": "Lista las preferencias del usuario guardadas y activas.", "parameters": {"type": "object", "properties": {}}},
 }
 
 
@@ -114,7 +130,14 @@ def _rule_from_text(text: str, db) -> dict:
     }
 
 
-def _execute(name: str, params: BaseModel | None, db, confirmed: bool = False) -> dict:
+def _execute(
+    name: str,
+    params: BaseModel | None,
+    db,
+    confirmed: bool = False,
+    source_session_id: int | None = None,
+    source_message_id: int | None = None,
+) -> dict:
     if name == "search_products":
         data, meta = list_products(db, 1, 100, normalize_name(params.query), params.supplier_id, params.category, "id")
         return {"summary": f"Se encontraron {meta['total']} productos en el catálogo importado.", "data": data}
@@ -199,10 +222,52 @@ def _execute(name: str, params: BaseModel | None, db, confirmed: bool = False) -
             else:
                 summary = "No hay artículos bajo su mínimo con los filtros y presupuesto actuales."
         return {"summary": summary, "data": data}
+    if name == "remember_fact":
+        if not confirmed:
+            return {
+                "summary": "El dato de memoria requiere confirmación antes de guardarse.",
+                "data": {"key": params.key, "value": params.value},
+                "confirmation_required": True,
+            }
+        if source_session_id is None:
+            raise ValueError("No se pudo asociar el dato de memoria con una sesión.")
+        fact = PersistentMemory(db).create_memory_fact(
+            params.key,
+            params.value,
+            source_session_id=source_session_id,
+            source_message_id=source_message_id,
+        )
+        return {
+            "summary": "La preferencia quedó guardada en la memoria del agente.",
+            "data": {
+                "id": fact.id,
+                "key": fact.key,
+                "value": fact.value,
+                "source_session_id": fact.source_session_id,
+                "source_message_id": fact.source_message_id,
+            },
+        }
+    if name == "list_memory_facts":
+        facts, total = PersistentMemory(db).list_memory_facts(limit=20)
+        return {
+            "summary": f"Hay {total} preferencias activas en la memoria del agente.",
+            "data": [
+                {"id": fact.id, "key": fact.key, "value": fact.value}
+                for fact in facts
+            ],
+        }
     raise ValueError(f"Herramienta desconocida: {name}")
 
 
-def execute_tool(name: str, arguments: dict[str, Any], db=None, confirmed: bool = False) -> dict:
+def execute_tool(
+    name: str,
+    arguments: dict[str, Any],
+    db=None,
+    confirmed: bool = False,
+    *,
+    source_session_id: int | None = None,
+    source_message_id: int | None = None,
+) -> dict:
     own_session = db is None
     db = db or SessionLocal()
     validators = {
@@ -212,13 +277,26 @@ def execute_tool(name: str, arguments: dict[str, Any], db=None, confirmed: bool 
         "create_equivalence_rule": NaturalRuleParams, "list_rules": lambda **_: None,
         "consolidate": ConsolidateParams, "get_inventory_report": InventoryParams,
         "get_purchase_suggestions": PurchaseParams,
+        "remember_fact": RememberFactParams,
+        "list_memory_facts": lambda **_: None,
     }
     try:
         validator = validators.get(name)
         if validator is None:
             raise ValueError(f"Herramienta desconocida: {name}")
-        params = validator(**arguments) if name not in {"list_rules", "list_pending_matches"} else None
-        result = _execute(name, params, db, confirmed=confirmed)
+        params = (
+            validator(**arguments)
+            if name not in {"list_rules", "list_pending_matches", "list_memory_facts"}
+            else None
+        )
+        result = _execute(
+            name,
+            params,
+            db,
+            confirmed=confirmed,
+            source_session_id=source_session_id,
+            source_message_id=source_message_id,
+        )
         if not result.get("confirmation_required"):
             db.commit()
         return result

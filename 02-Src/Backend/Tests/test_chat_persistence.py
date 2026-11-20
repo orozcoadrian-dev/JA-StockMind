@@ -14,7 +14,14 @@ from Backend.Agent.core import AgentCore
 from Backend.Agent.persistent_memory import PersistentMemory, SessionNotFoundError
 from app.db.base import Base
 from app.core.errors import register_exception_handlers
-from app.models import AgentAction, ChatMessage, ChatMessageRole, ChatSession, ChatSessionStatus
+from app.models import (
+    AgentAction,
+    AgentMemoryFact,
+    ChatMessage,
+    ChatMessageRole,
+    ChatSession,
+    ChatSessionStatus,
+)
 
 
 @compiles(mysql.TINYINT, "sqlite")
@@ -90,6 +97,7 @@ class ChatPersistenceTest(unittest.TestCase):
                     ChatSession.__table__,
                     ChatMessage.__table__,
                     Base.metadata.tables["agent_actions"],
+                    AgentMemoryFact.__table__,
                 ],
             )
         finally:

@@ -115,10 +115,11 @@ El agente debe:
 - La consolidación crea `CanonicalProduct` y `ProductLink`; los vínculos son reversibles mediante `revert_link`.
 - Las sugerencias se persisten como `MatchSuggestion` y cuentan con endpoints de sugerencia, pendientes, confirmación y rechazo.
 - La prueba obligatoria confirma que el grip rojo de Guerrero y Malusa coincide, pero el grip azul y la medida distinta se descartan.
-- El agente agéntico está implementado en `Backend/Agent/`: herramientas validadas, prompt de sistema, memoria por sesión y loop de hasta ocho iteraciones.
+- El agente agéntico está implementado en `Backend/Agent/`: herramientas validadas, prompt de sistema, historial persistido en SQL y loop de hasta ocho iteraciones.
+- Las tablas `ChatSession`, `ChatMessage` y `AgentMemoryFact` conservan sesiones, mensajes, preferencias confirmadas y resúmenes; no hay almacenamiento de historial en RAM en el flujo activo.
 - Las herramientas registran cada ejecución en `AgentAction` y las operaciones destructivas esperan confirmación explícita.
 - Las reglas creadas por lenguaje natural se muestran estructuradas, esperan confirmación, se persisten y se aplican retroactivamente.
-- Los endpoints del agente están disponibles en `/api/v1/agent/chat`, `/api/v1/agent/confirm` y `/api/v1/agent/actions`.
+- Los endpoints del agente están disponibles en `/api/v1/agent/chat`, `/api/v1/agent/confirm`, `/api/v1/agent/actions`, `/api/v1/agent/sessions` y `/api/v1/agent/memory/facts`.
 - La API REST versionada está disponible bajo `/api/v1`, con CRUD de proveedores, importaciones, productos, catálogo, reglas, coincidencias, agente y reportes.
 - Las respuestas versionadas usan `data/meta` en éxito y `error {code, message, details}` en fallos; los listados incluyen paginación.
 - OpenAPI se genera en `/docs` y `/redoc`; los ejemplos ejecutables por endpoint están en `Backend/requests.http`.
@@ -128,7 +129,7 @@ El agente debe:
 - Se estableció la identidad visual hueso/grafito/verde, navegación lateral responsive, tabla densa y respeto por `prefers-reduced-motion`.
 - La entrega del parcial está preparada: `demo/seed.py` genera cuatro Excel de 85 filas y deja sugerencias listas para mostrar.
 - `README.md`, `docs/arquitectura.md` y `docs/demo.md` documentan instalación, arquitectura, flujo agéntico y sustentación.
-- La cobertura validada es 87% para `Backend/Agent/tools.py` y 82% para el conjunto de servicios y agente.
+- La cobertura validada es 90% para `Backend/Agent/tools.py`, 89% para `Backend/Agent/persistent_memory.py` y 69% para el conjunto de servicios y agente.
 - Una copia limpia temporal creó un venv, instaló `Backend/requirements.txt`, ejecutó el seed y pasó las 27 pruebas.
 
 ### Siguiente paso
@@ -136,6 +137,42 @@ El agente debe:
 
 ### Pendiente por actualizar
 - No hay bloqueos funcionales pendientes para la entrega.
+
+---
+
+## Modelo de datos
+- `chat_sessions`: sesión con UUID4 externo, estado, título y marcas de último mensaje/conteo.
+- `chat_messages`: historial ordenado por `seq`; roles `user`, `assistant`, `tool` y `system`. Los resúmenes se guardan como `system` con metadatos de secuencia.
+- `agent_memory_facts`: `key`, `value`, sesión/mensaje de origen, estado `active|disabled` y marcas de tiempo. Deshabilitar no elimina el fact.
+- `agent_actions`: auditoría de herramientas y confirmaciones, enlazada con la sesión cuando aplica.
+- Todas las filas de mensajes originales permanecen en la base; el resumen solo sustituye mensajes antiguos en el contexto del LLM.
+
+## API y contratos
+- Prefijo `/api/v1`; respuestas exitosas `{ "data": ..., "meta": ... }` y errores `{ "error": { "code", "message", "details" } }`.
+- `POST /agent/chat`: `message` entre 1 y 8000 caracteres y `session_id` UUID4 opcional; mensajes mayores o IDs inválidos responden 422.
+- `/agent/sessions`: listado paginado y operaciones de crear, consultar, actualizar, archivar, listar mensajes y exportar.
+- `GET /agent/memory/facts?status=active|disabled|all&limit=20&offset=0` lista facts. `PATCH /agent/memory/facts/{id}` acepta `{"status":"disabled"}`; no existe eliminación.
+- `POST /agent/confirm` confirma/rechaza acciones y `GET /agent/actions` lista auditoría.
+- Riesgo abierto: los endpoints no autentican ni filtran por propietario; UUID4 solo dificulta adivinar IDs y el endpoint de listado expone UUIDs. No publicar la API a usuarios no confiables hasta incorporar autenticación y autorización por propietario.
+
+## Flujo agéntico
+1. El chat persiste cada mensaje y reconstruye contexto desde MySQL; el historial no depende de la vida del proceso.
+2. Se agregan hasta 20 facts activos en un bloque `system`; `remember_fact` devuelve `confirmation_required` y solo escribe tras confirmación.
+3. Al superar `AGENT_SUMMARY_THRESHOLD`, el LLM resume los mensajes antiguos; el resumen queda como mensaje `system`, se mantiene un tramo reciente y se preservan mensajes y pares de herramientas originales.
+4. `AGENT_MEMORY_MAX_MESSAGES` limita el tramo de conversación enviado al LLM. Los mensajes de pantalla se insertan con `textContent`; los datos persistidos no se consideran instrucciones confiables para el modelo.
+
+## Variables
+- `AGENT_MEMORY_MAX_MESSAGES`: mensajes recientes en contexto, por defecto `30`.
+- `AGENT_SUMMARY_THRESHOLD`: cantidad de mensajes sin resumir que dispara un resumen, por defecto `60`.
+- `GEMINI_API_KEY`, `GEMINI_API_URL`, `GEMINI_MODEL`: conexión del LLM.
+- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`: conexión MySQL.
+
+Migraciones MySQL (ejecutar desde `02-Src`, en orden):
+
+```bash
+mysql --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --password --database="$DB_NAME" < Backend/app/db/migrations/001_chat_persistence.sql
+mysql --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --password --database="$DB_NAME" < Backend/app/db/migrations/002_agent_memory_facts.sql
+```
 
 ---
 

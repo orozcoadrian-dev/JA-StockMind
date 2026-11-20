@@ -1,16 +1,17 @@
 import unittest
+from datetime import datetime
 from unittest.mock import Mock, patch
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from Backend.Agent.core import AgentCore, GeminiClient
-from Backend.Agent.memory import ConversationMemory
 from Backend.Agent.tools import TOOL_SCHEMAS, execute_tool
 from app.db.base import Base
-from app.models import AgentAction, ChatMessage, ChatSession
+from app.models import AgentAction, AgentMemoryFact, ChatMessage, ChatSession
 
 
 @compiles(mysql.TINYINT, "sqlite")
@@ -110,13 +111,22 @@ class AgentWorkflowTest(unittest.TestCase):
     def setUp(self):
         self.db = Mock()
         self.db.scalars.return_value.all.return_value = []
-        self.engine = create_engine("sqlite:///:memory:")
+        self.engine = create_engine(
+            "sqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
         updated_at_default = ChatSession.__table__.c.updated_at.server_default
         ChatSession.__table__.c.updated_at.server_default = text("CURRENT_TIMESTAMP")
         try:
             Base.metadata.create_all(
                 self.engine,
-                tables=[ChatSession.__table__, AgentAction.__table__, ChatMessage.__table__],
+                tables=[
+                    ChatSession.__table__,
+                    AgentAction.__table__,
+                    ChatMessage.__table__,
+                    AgentMemoryFact.__table__,
+                ],
             )
         finally:
             ChatSession.__table__.c.updated_at.server_default = updated_at_default
@@ -132,7 +142,14 @@ class AgentWorkflowTest(unittest.TestCase):
 
     def create_session(self, external_id):
         db = self.agent_session_factory()
-        session = ChatSession(external_id=external_id, message_count=0)
+        now = datetime.now()
+        session = ChatSession(
+            external_id=external_id,
+            message_count=0,
+            created_at=now,
+            updated_at=now,
+            last_message_at=now,
+        )
         db.add(session)
         db.commit()
         db.close()
@@ -153,12 +170,12 @@ class AgentWorkflowTest(unittest.TestCase):
         response = Mock()
         response.json.return_value = {"choices": [{"message": {"content": "Respuesta"}}]}
         with (
-            patch.dict("os.environ", {"GEMINI_API_KEY": "test-key"}, clear=True),
+            patch.dict("os.environ", {"GEMINI_API_KEY": "unit-key"}, clear=True),
             patch("Backend.Agent.core.httpx.post", return_value=response) as post,
         ):
             GeminiClient().complete([], {})
 
-        self.assertEqual(post.call_args.kwargs["headers"]["Authorization"], "Bearer test-key")
+        self.assertEqual(post.call_args.kwargs["headers"]["Authorization"], "Bearer unit-key")
 
     def test_agent_caps_configured_loop_at_eight_iterations(self):
         core = AgentCore(
@@ -245,15 +262,6 @@ class AgentWorkflowTest(unittest.TestCase):
 
         self.assertTrue(result["confirmation_required"])
         self.assertIn("confirmación", result["summary"].lower())
-
-    def test_memory_summarizes_old_messages(self):
-        memory = ConversationMemory(max_messages=3)
-        for index in range(5):
-            memory.add("user", f"mensaje {index}")
-
-        messages = memory.messages()
-        self.assertLessEqual(len(messages), 4)
-        self.assertTrue(any(message["role"] == "system" for message in messages))
 
     def test_confirmed_rule_uses_live_suppliers_and_recalculates_matches(self):
         query_results = iter((

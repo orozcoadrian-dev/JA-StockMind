@@ -2,13 +2,55 @@ import unittest
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, text
+from sqlalchemy.dialects import mysql
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from Backend.app import app
+from app.db.base import Base
+from Backend.app.db.session import get_db
+from app.models import Category, Import, Product, Supplier
+
+
+@compiles(mysql.TINYINT, "sqlite")
+def compile_mysql_tinyint_for_sqlite(type_, compiler, **kwargs):
+    return "INTEGER"
 
 
 class RestApiIntegrationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.engine = create_engine(
+            "sqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        cls.session_factory = sessionmaker(bind=cls.engine, expire_on_commit=False)
+        updated_at_default = Product.__table__.c.updated_at.server_default
+        Product.__table__.c.updated_at.server_default = text("CURRENT_TIMESTAMP")
+        try:
+            Base.metadata.create_all(
+                cls.engine,
+                tables=[
+                    Category.__table__,
+                    Supplier.__table__,
+                    Import.__table__,
+                    Product.__table__,
+                ],
+            )
+        finally:
+            Product.__table__.c.updated_at.server_default = updated_at_default
+
+        def override_get_db():
+            db = cls.session_factory()
+            try:
+                yield db
+            finally:
+                db.close()
+
+        app.dependency_overrides[get_db] = override_get_db
         cls.client = TestClient(app)
         cls.name = f"Proveedor prueba {uuid4().hex[:8]}"
         response = cls.client.post("/api/v1/suppliers", json={"name": cls.name, "nit": f"T-{uuid4().hex[:8]}"})
@@ -17,6 +59,8 @@ class RestApiIntegrationTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.client.delete(f"/api/v1/suppliers/{cls.supplier['id']}")
+        app.dependency_overrides.pop(get_db, None)
+        cls.engine.dispose()
 
     def test_create_supplier_returns_location_and_standard_envelope(self):
         response = self.client.get(f"/api/v1/suppliers/{self.supplier['id']}")

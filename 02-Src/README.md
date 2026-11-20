@@ -98,7 +98,7 @@ Para ver específicamente las herramientas del agente:
 python -m coverage report -m Backend/Agent/tools.py
 ```
 
-La medición validada entrega 87% en `Backend/Agent/tools.py` y 82% en el conjunto de servicios y agente. Las pruebas cubren contratos, precios colombianos, normalización, importación idempotente, equivalencias rojo/azul/medida, reglas naturales, confirmación retroactiva, herramientas, API REST y datos demo.
+La medición actual entrega 90% en `Backend/Agent/tools.py`, 89% en `Backend/Agent/persistent_memory.py` y 69% en el conjunto de servicios y agente. Las pruebas cubren contratos, precios colombianos, normalización, importación idempotente, equivalencias rojo/azul/medida, reglas naturales, confirmación retroactiva, herramientas, API REST, memoria persistente y datos demo.
 
 ## Estructura
 
@@ -127,9 +127,25 @@ Todas las rutas nuevas usan `/api/v1` y respuestas `{ "data": ..., "meta": ... }
 - `/matches`: sugerencias pendientes, confirmación y rechazo.
 - `/rules`: reglas de equivalencia.
 - `/agent`: chat, confirmaciones y auditoría.
+- `/agent/memory/facts`: preferencias persistentes del agente; se pueden deshabilitar sin borrarlas.
 - `/reports`: inventario, precios y compras.
 
 Los errores usan `{ "error": { "code", "message", "details" } }`. Las rutas `/api/...` anteriores se conservan como aliases legacy.
+
+## Memoria persistente del agente
+
+El historial completo queda en `chat_messages`. Las preferencias estables se almacenan en `agent_memory_facts` y solo se guardan después de confirmar la acción `remember_fact`; `list_memory_facts` permite consultarlas. `GET /api/v1/agent/memory/facts` lista los facts (`status=active|disabled|all`) y `PATCH /api/v1/agent/memory/facts/{id}` acepta `{"status":"disabled"}`. Deshabilitar no elimina el registro.
+
+Al superar `AGENT_SUMMARY_THRESHOLD` mensajes sin resumir (por defecto `60`), el agente pide al LLM un resumen y lo guarda como mensaje `system`. Los mensajes originales nunca se borran; el contexto usa el resumen más reciente y los mensajes posteriores. El bloque de preferencias activas se limita a 20 facts. `AGENT_MEMORY_MAX_MESSAGES` (por defecto `30`) define el contexto reciente conservado.
+
+`POST /api/v1/agent/chat` limita `message` a 8000 caracteres y acepta `session_id` solo como UUID4; las rutas de sesiones validan el mismo formato. UUID4 reduce la enumeración, pero no es autorización: hoy los endpoints de sesión y memoria no tienen identidad/propietario y el listado de sesiones es global. Mantén esta API en una red confiable hasta añadir autenticación y aislamiento por usuario. El frontend inserta mensajes con `textContent`; los mensajes y facts siguen siendo datos no confiables para el LLM y no deben considerarse una frontera contra prompt injection.
+
+En MySQL, aplica las migraciones en orden desde `02-Src`:
+
+```bash
+mysql --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --password --database="$DB_NAME" < Backend/app/db/migrations/001_chat_persistence.sql
+mysql --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --password --database="$DB_NAME" < Backend/app/db/migrations/002_agent_memory_facts.sql
+```
 
 ## Flujo recomendado para la sustentación
 

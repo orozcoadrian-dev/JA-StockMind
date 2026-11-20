@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Generic, TypeVar
 
-from pydantic import AliasChoices, BaseModel, Field, model_validator
+from pydantic import AliasChoices, BaseModel, Field, UUID4, model_validator
 
 
 DataT = TypeVar("DataT")
@@ -129,8 +129,8 @@ class MatchConfirmRequest(BaseModel):
 
 
 class AgentChatRequest(BaseModel):
-    message: str = Field(min_length=1, max_length=10000)
-    session_id: str | None = Field(default=None, min_length=1, max_length=36)
+    message: str = Field(min_length=1, max_length=8000)
+    session_id: UUID4 | None = None
 
 
 class AgentConfirmRequest(BaseModel):
